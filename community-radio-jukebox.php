@@ -1,32 +1,39 @@
 <?php
 /**
  * Plugin Name: Community Radio Jukebox
- * Plugin URI:  https://github.com/local-jukebox/local-jukebox
- * Description: Interactive 3D Jukebox with Auto-DJ Flush Prediction, Select2 Admin Autocomplete, Preview UI Patches, and Gemini 2.5 Pro.
- * Version:     4.51.0
- * Author:      Local Jukebox Architecture
+ * Plugin URI:  https://github.com/corlett201660/community-radio-jukebox
+ * Description: NOTE: REQUIRES BOOTSTRAP COMPATABLE THEME. Interactive Jukebox with Auto-DJ Flush Prediction, WooCommerce Artist Tipping, Marquee Patches, DJ Drops, Visual Schedules, Monthly Logging, AI Explicit Profiling, and Gemini 2.5 Pro. Self-healing site URL adaptive system with theme-hardened UI layout architecture.
+ * Version:     4.63.0
+ * Author:      corlett201660
  * License:     GPL v2 or later
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ==========================================
-// 1. ASSET MANAGER
+// 1. ASSET MANAGER & UTILITIES
 // ==========================================
-define( 'LJ_VERSION', '4.51.0' );
+define( 'LJ_VERSION', '4.63.0' );
 define( 'LJ_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 class LJ_Asset_Manager {
     public function __construct() {
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+        add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_frontend_assets' ] );
         add_filter( 'script_loader_tag', [ $this, 'add_module_type_attribute' ], 10, 3 );
     }
     
     public function enqueue_admin_assets() { 
         wp_enqueue_media(); 
-        // Enqueue Select2 for Admin Autocomplete
-        wp_enqueue_style('lj-select2-css', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css', [], '4.1.0');
-        wp_enqueue_script('lj-select2-js', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', ['jquery'], '4.1.0', true);
+        wp_enqueue_style('lj-select2-css', LJ_PLUGIN_URL . 'assets/css/select2.min.css', [], '4.1.0');
+        wp_enqueue_script('lj-select2-js', LJ_PLUGIN_URL . 'assets/js/select2.min.js', ['jquery'], '4.1.0', true);
+    }
+
+    public function enqueue_frontend_assets() {
+        wp_enqueue_script('jquery');
+        wp_enqueue_style( 'lj-fontawesome', LJ_PLUGIN_URL . 'assets/css/all.min.css', [], '6.4.0' );
+        wp_enqueue_style( 'lj-bootstrap', LJ_PLUGIN_URL . 'assets/css/bootstrap.min.css', [], '5.3.0' );
+        wp_enqueue_script( 'lj-bootstrap-js', LJ_PLUGIN_URL . 'assets/js/bootstrap.bundle.min.js', ['jquery'], '5.3.0', true );
     }
 
     public function add_module_type_attribute( $tag, $handle, $src ) {
@@ -37,6 +44,86 @@ class LJ_Asset_Manager {
     }
 }
 new LJ_Asset_Manager();
+
+/**
+ * Dynamic Self-Healing URL Resolver
+ * Resolves Media URLs against current domain settings on the fly.
+ */
+function lj_get_song_audio_url($post_id, $type = 'full') {
+    if ($type === 'full') {
+        $attachment_id = get_post_meta($post_id, 'lj_audio_attachment_id', true);
+        if ($attachment_id) {
+            $url = wp_get_attachment_url($attachment_id);
+            if ($url) return $url;
+        }
+        return get_post_meta($post_id, 'full_audio_url', true);
+    } elseif ($type === 'preview') {
+        $preview_url = get_post_meta($post_id, 'preview_url', true);
+        if ($preview_url) {
+            $attachment_id = attachment_url_to_postid($preview_url);
+            if ($attachment_id) {
+                return wp_get_attachment_url($attachment_id);
+            }
+            if (strpos($preview_url, '/wp-content/') !== false) {
+                $path = parse_url($preview_url, PHP_URL_PATH);
+                return site_url($path);
+            }
+            return $preview_url;
+        }
+        return lj_get_song_audio_url($post_id, 'full');
+    } elseif ($type === 'intro') {
+        $attachment_id = get_post_meta($post_id, 'lj_intro_attachment_id', true);
+        if ($attachment_id) {
+            $url = wp_get_attachment_url($attachment_id);
+            if ($url) return $url;
+        }
+        return get_post_meta($post_id, 'intro_audio_url', true);
+    } elseif ($type === 'outro') {
+        $attachment_id = get_post_meta($post_id, 'lj_outro_attachment_id', true);
+        if ($attachment_id) {
+            $url = wp_get_attachment_url($attachment_id);
+            if ($url) return $url;
+        }
+        return get_post_meta($post_id, 'outro_audio_url', true);
+    }
+    return '';
+}
+
+/**
+ * Background Database Recovery Handler
+ * Matches legacy hardcoded strings to Attachment entries when a site rename occurs.
+ */
+add_action('admin_init', 'lj_auto_heal_legacy_urls');
+function lj_auto_heal_legacy_urls() {
+    if (get_option('lj_urls_healed_to_ids_v3')) return;
+
+    $songs = get_posts(['post_type' => 'lj_song', 'posts_per_page' => -1]);
+    foreach ($songs as $song) {
+        $full_url = get_post_meta($song->ID, 'full_audio_url', true);
+        if ($full_url && !get_post_meta($song->ID, 'lj_audio_attachment_id', true)) {
+            $id = attachment_url_to_postid($full_url);
+            if ($id) {
+                update_post_meta($song->ID, 'lj_audio_attachment_id', $id);
+            }
+        }
+        $intro_url = get_post_meta($song->ID, 'intro_audio_url', true);
+        if ($intro_url && !get_post_meta($song->ID, 'lj_intro_attachment_id', true)) {
+            $id = attachment_url_to_postid($intro_url);
+            if ($id) {
+                update_post_meta($song->ID, 'lj_intro_attachment_id', $id);
+            }
+        }
+        $outro_url = get_post_meta($song->ID, 'outro_audio_url', true);
+        if ($outro_url && !get_post_meta($song->ID, 'lj_outro_attachment_id', true)) {
+            $id = attachment_url_to_postid($outro_url);
+            if ($id) {
+                update_post_meta($song->ID, 'lj_outro_attachment_id', $id);
+            }
+        }
+    }
+    update_option('lj_urls_healed_to_ids_v3', time());
+    update_option('lj_catalog_version', time());
+}
 
 // ==========================================
 // 2. CORE SETUP, CPTS, & TAXONOMIES
@@ -73,12 +160,12 @@ function lj_register_settings() {
     register_setting('lj_settings_group', 'lj_gemini_api_key', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
     register_setting('lj_settings_group', 'lj_enable_submissions', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('lj_settings_group', 'lj_allow_explicit', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
+    register_setting('lj_settings_group', 'lj_exclude_licensed', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('lj_settings_group', 'lj_strict_event_mode', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('lj_settings_group', 'lj_submission_url', ['type' => 'string', 'sanitize_callback' => 'esc_url_raw']);
 }
 
 function lj_settings_page() {
-    $export_url = wp_nonce_url( admin_url('admin-post.php?action=lj_export_log'), 'lj_export_action' );
     $gemini_nonce = wp_create_nonce('lj_gemini_scan_action');
     ?>
     <div class="wrap">
@@ -90,7 +177,7 @@ function lj_settings_page() {
                     <th scope="row">Google Gemini API Key</th>
                     <td>
                         <input type="password" name="lj_gemini_api_key" value="<?php echo esc_attr(get_option('lj_gemini_api_key')); ?>" class="regular-text" placeholder="AIzaSy..." />
-                        <p class="description">Required for Gemini 2.5 Pro AI Audio Scanning (Genres & Lyrics). Get this from Google AI Studio.</p>
+                        <p class="description">Required for Gemini 2.5 Pro AI Audio Scanning (Explicit Flags, Genres & Lyrics). Get this from Google AI Studio.</p>
                     </td>
                 </tr>
                 <tr>
@@ -98,6 +185,13 @@ function lj_settings_page() {
                     <td>
                         <input type="checkbox" name="lj_allow_explicit" value="1" <?php checked(1, get_option('lj_allow_explicit', 1), true); ?> />
                         <label>If unchecked, all songs marked as "Explicit" are instantly hidden from the catalog and skipped by the Auto-DJ.</label>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">Exclude Licensed Music</th>
+                    <td>
+                        <input type="checkbox" name="lj_exclude_licensed" value="1" <?php checked(1, get_option('lj_exclude_licensed'), true); ?> />
+                        <label>If checked, all standard tracks will be hidden and skipped. Only tracks marked as <strong>Royalty Free</strong> or with a <strong>License Override</strong> will play.</label>
                     </td>
                 </tr>
                 <tr>
@@ -125,30 +219,52 @@ function lj_settings_page() {
         </form>
 
         <hr style="margin: 30px 0;">
+        <h2>Monthly Broadcast Log Export</h2>
+        <table class="form-table">
+            <tr>
+                <th scope="row">Download CSV by Month</th>
+                <td>
+                    <?php
+                    $available_months = get_option('lj_broadcast_log_months', []);
+                    $legacy_log = get_option('lj_broadcast_log', []);
+                    
+                    if (empty($available_months) && empty($legacy_log)) {
+                        echo '<p>No broadcast history available yet.</p>';
+                    } else {
+                        echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '" style="display:flex; gap:10px; align-items:center;">';
+                        echo '<input type="hidden" name="action" value="lj_export_log">';
+                        wp_nonce_field('lj_export_action');
+                        echo '<select name="log_month" style="padding: 4px 8px;">';
+                        foreach ($available_months as $m) {
+                            $label = gmdate('F Y', strtotime(str_replace('_', '-', $m) . '-01'));
+                            echo '<option value="' . esc_attr($m) . '">' . esc_html($label) . '</option>';
+                        }
+                        if (!empty($legacy_log)) {
+                            echo '<option value="legacy">Legacy Log (Pre-Update)</option>';
+                        }
+                        echo '</select>';
+                        echo '<button type="submit" class="button button-secondary">Export Log</button>';
+                        echo '</form>';
+                    }
+                    ?>
+                    <p class="description" style="margin-top:10px;">Select a month to download a detailed CSV of all completed tracks played across <strong>all active stations</strong> (Ideal for ASCAP/BMI reporting).</p>
+                </td>
+            </tr>
+        </table>
+
+        <hr style="margin: 30px 0;">
         <h2>Gemini AI Bulk Catalog Scanner</h2>
         <table class="form-table">
             <tr>
-                <th scope="row">Auto-Tag Missing Genres & Lyrics</th>
+                <th scope="row">Auto-Tag Missing Genres, Explicit Flags & Lyrics</th>
                 <td>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <button type="button" id="lj_bulk_scan_btn" class="button button-primary">Scan Incomplete Library</button>
                         <button type="button" id="lj_clear_ai_data_btn" class="button button-secondary" style="color: #d63638; border-color: #d63638;">Wipe All AI Data</button>
                     </div>
                     <span id="lj_bulk_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
-                    <p class="description"><strong>Scan Incomplete Library:</strong> Processes up to 10 songs missing either Genres or Lyrics. Click multiple times for large libraries.<br>
+                    <p class="description"><strong>Scan Incomplete Library:</strong> Processes up to 10 songs missing standard layout vectors via the Gemini API. Listen-profiling evaluates metadata alongside explicit indexing.<br>
                     <strong>Wipe All AI Data:</strong> Instantly deletes all AI-generated Genres and Lyrics from every track in your catalog so you can start a fresh rescan.</p>
-                </td>
-            </tr>
-        </table>
-
-        <hr style="margin: 30px 0;">
-        <h2>Global Broadcast Log Export</h2>
-        <table class="form-table">
-            <tr>
-                <th scope="row">Download Master CSV</th>
-                <td>
-                    <a href="<?php echo esc_url($export_url); ?>" class="button button-secondary">Export 30-Day Broadcast Log</a>
-                    <p class="description">Generates a massive CSV of all completed tracks played across <strong>all active stations</strong> over the last 30 days (Ideal for ASCAP/BMI reporting).</p>
                 </td>
             </tr>
         </table>
@@ -235,6 +351,7 @@ function lj_gemini_clear_all_handler() {
     foreach ($all_songs as $song_id) {
         wp_set_object_terms($song_id, [], 'lj_genre'); 
         delete_post_meta($song_id, 'lj_lyrics'); 
+        delete_post_meta($song_id, 'lj_is_explicit');
         $cleared++;
     }
 
@@ -306,7 +423,7 @@ function lj_execute_gemini_scan($song_id) {
     if (empty($api_key)) return new WP_Error('no_key', 'Gemini API key is missing in Jukebox Settings.');
 
     $attachment_id = get_post_meta($song_id, 'lj_audio_attachment_id', true);
-    $audio_url = get_post_meta($song_id, 'full_audio_url', true);
+    $audio_url = lj_get_song_audio_url($song_id, 'full');
     $title = get_the_title($song_id);
     $artist_terms = wp_get_post_terms($song_id, 'lj_artist', ['fields' => 'names']);
     $artist = !empty($artist_terms) ? implode(', ', $artist_terms) : 'Unknown Artist';
@@ -347,7 +464,7 @@ function lj_execute_gemini_scan($song_id) {
         return new WP_Error('no_audio', "Audio unavailable for '{$title}': {$reason}");
     }
 
-    $prompt = "You are an expert music curator and strict audio transcriptionist. Listen to the provided audio track.\n\nSTRICT RULES:\n1. For 'genres', provide an array of 2 to 4 accurate standard musical genres/sub-genres based on the sonic profile.\n2. For 'lyrics', you MUST ONLY transcribe the exact words you hear in the audio file. DO NOT hallucinate, guess, or search for lyrics based on the title or artist. If there are no vocals, or if you cannot clearly hear them, output exactly: 'Instrumental'.\n\nReturn a JSON object with exactly two keys: 'genres' and 'lyrics'.";
+    $prompt = "You are an expert music curator and strict audio transcriptionist. Listen to the provided audio track.\n\nSTRICT RULES:\n1. For 'genres', provide an array of 2 to 4 accurate standard musical genres/sub-genres based on the sonic profile.\n2. For 'lyrics', you MUST ONLY transcribe the exact words you hear in the audio file. DO NOT hallucinate, guess, or search for lyrics based on the title or artist. If there are no vocals, or if you cannot clearly hear them, output exactly: 'Instrumental'.\n3. For 'is_explicit', analyze the audio and lyrics for strong profanity, explicit sexual themes, or highly sensitive/graphic violent content. Return a boolean true if explicit content is present, or false if the track is completely clean.\n\nReturn a JSON object with exactly three keys: 'genres', 'lyrics', and 'is_explicit'.";
 
     $payload = [
         "contents" => [
@@ -398,6 +515,11 @@ function lj_execute_gemini_scan($song_id) {
             update_post_meta($song_id, 'lj_lyrics', sanitize_textarea_field($data['lyrics']));
             $response_data['lyrics_status'] = 'Transcribed';
         }
+
+        if (isset($data['is_explicit'])) {
+            update_post_meta($song_id, 'lj_is_explicit', $data['is_explicit'] ? '1' : '0');
+            $response_data['explicit_status'] = $data['is_explicit'] ? 'Explicit' : 'Clean';
+        }
         
         update_option('lj_catalog_version', time());
         return $response_data;
@@ -410,23 +532,42 @@ function lj_execute_gemini_scan($song_id) {
 add_action('admin_post_lj_export_log', 'lj_export_broadcast_log_handler');
 function lj_export_broadcast_log_handler() {
     if (!current_user_can('manage_options')) wp_die('Unauthorized access.');
-    if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( $_GET['_wpnonce'] ), 'lj_export_action' ) ) { wp_die( 'Security check failed. The link may have expired.' ); }
-    $log = get_option('lj_broadcast_log', []);
-    $filename = 'jukebox-broadcast-log-' . gmdate('Y-m-d-H-i') . '.csv';
+    if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( $_POST['_wpnonce'] ), 'lj_export_action' ) ) { wp_die( 'Security check failed. The link may have expired.' ); }
+    
+    $month_key = isset($_POST['log_month']) ? sanitize_text_field(wp_unslash($_POST['log_month'])) : '';
+    
+    if ($month_key === 'legacy') {
+        $log = get_option('lj_broadcast_log', []);
+        $filename = 'jukebox-legacy-log-' . gmdate('Y-m-d-H-i') . '.csv';
+    } elseif ($month_key) {
+        $log = get_option('lj_broadcast_log_' . $month_key, []);
+        $filename = 'jukebox-log-' . $month_key . '.csv';
+    } else {
+        $months = get_option('lj_broadcast_log_months', []);
+        if (!empty($months)) {
+            $month_key = $months[0];
+            $log = get_option('lj_broadcast_log_' . $month_key, []);
+            $filename = 'jukebox-log-' . $month_key . '.csv';
+        } else {
+            $log = [];
+            $filename = 'jukebox-log-empty.csv';
+        }
+    }
+
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=' . $filename);
-    ob_start();
-    function lj_escape_csv($val) { return '"' . str_replace('"', '""', (string)$val) . '"'; }
-    echo lj_escape_csv('Station') . ',' . lj_escape_csv('Song Title') . ',' . lj_escape_csv('Artist') . ',' . lj_escape_csv('Started At') . ',' . lj_escape_csv('Finished At') . ',' . lj_escape_csv('Active Listeners') . "\n";
+    $output = fopen('php://output', 'w');
+    fputcsv($output, ['Station', 'Song Title', 'Artist', 'Started At', 'Finished At', 'Active Listeners']);
     foreach ($log as $entry) {
-        echo lj_escape_csv($entry['station'] ?? 'global') . ',';
-        echo lj_escape_csv(html_entity_decode($entry['title'])) . ',';
-        echo lj_escape_csv(html_entity_decode($entry['artist'])) . ',';
-        echo lj_escape_csv(wp_date('Y-m-d H:i:s', $entry['start_time'])) . ',';
-        echo lj_escape_csv(wp_date('Y-m-d H:i:s', $entry['end_time'])) . ',';
-        echo lj_escape_csv($entry['listeners']) . "\n";
+        fputcsv($output, [
+            $entry['station'] ?? 'global',
+            html_entity_decode($entry['title']),
+            html_entity_decode($entry['artist']),
+            wp_date('Y-m-d H:i:s', $entry['start_time']),
+            wp_date('Y-m-d H:i:s', $entry['end_time']),
+            $entry['listeners']
+        ]);
     }
-    echo ob_get_clean();
     exit;
 }
 
@@ -466,7 +607,7 @@ function lj_tutorial_page() {
             <h2 style="margin-top: 0;">5. Live Event DJ Workflow</h2>
             <p>When you have a live DJ in the booth, you can use the Jukebox to boost crowd interaction without interfering with the DJ's live set. Here is the recommended workflow:</p>
             <ol style="font-size: 14px;">
-                <li><strong>The Visualizer Backdrop:</strong> Open the Jukebox on a laptop connected to a projector or venue TVs. Put the browser in full-screen mode to display the audio-reactive 3D starfield.</li>
+                <li><strong>The Visualizer Backdrop:</strong> Open the Jukebox on a laptop connected to a projector or venue TVs. (Fullscreen recommended).</li>
                 <li><strong>The Request Line (Muted Mode):</strong> Have the DJ open the Jukebox URL on an iPad in the booth. <strong>Ensure the iPad's volume is muted.</strong> As patrons scan QR codes at their tables and vote for songs, the DJ can watch the Jukebox Queue update in real-time to gauge the crowd's mood and use it as a digital request board.</li>
                 <li><strong>The Autopilot Break:</strong> If the DJ needs to take a break or run to the bathroom, they simply fade up the audio channel connected to the Jukebox projector. The Jukebox takes over on autopilot, perfectly in sync, playing the crowd's highest-voted track.</li>
             </ol>
@@ -485,20 +626,16 @@ function lj_tutorial_page() {
 // DEDICATED TRACK PAGE FRONTEND DISPLAY
 // ------------------------------------------
 
-// Add CSS to head to forcefully hide sidebars on the dedicated song page
 add_action('wp_head', 'lj_hide_sidebar_on_song_page');
 function lj_hide_sidebar_on_song_page() {
     if (is_singular('lj_song')) {
         echo '<style>
-            /* Force hiding of common theme sidebars */
             #secondary, #sidebar, .sidebar, .widget-area, aside#secondary { display: none !important; }
-            /* Force primary content area to stretch full width */
             #primary, #content, .site-main, .content-area, .site-content { width: 100% !important; max-width: none !important; float: none !important; border: none !important; }
         </style>';
     }
 }
 
-// Inject JSON-LD Schema for SEO
 add_action('wp_head', 'lj_inject_song_structured_data');
 function lj_inject_song_structured_data() {
     if (is_singular('lj_song')) {
@@ -538,7 +675,6 @@ function lj_inject_song_structured_data() {
     }
 }
 
-// Add common body classes that themes use to trigger full-width layouts
 add_filter('body_class', 'lj_song_full_width_body_classes');
 function lj_song_full_width_body_classes($classes) {
     if (is_singular('lj_song')) {
@@ -557,6 +693,7 @@ function lj_song_dedicated_page_content($content) {
         $is_explicit = get_post_meta($post_id, 'lj_is_explicit', true);
         $always_available = get_post_meta($post_id, 'lj_always_available', true);
         $is_royalty_free = get_post_meta($post_id, 'lj_royalty_free', true);
+        $tip_url = get_post_meta($post_id, 'lj_tip_url', true);
         
         $artist_terms = wp_get_post_terms($post_id, 'lj_artist', ['fields' => 'names']);
         $artist = !empty($artist_terms) ? implode(', ', $artist_terms) : 'Unknown Artist';
@@ -573,10 +710,9 @@ function lj_song_dedicated_page_content($content) {
             $duration_fmt = floor($duration / 60) . ':' . str_pad($duration % 60, 2, '0', STR_PAD_LEFT);
         }
 
-        $full_audio_url = get_post_meta($post_id, 'full_audio_url', true);
-        $preview_url = get_post_meta($post_id, 'preview_url', true) ?: $full_audio_url;
+        $full_audio_url = lj_get_song_audio_url($post_id, 'full');
+        $preview_url = lj_get_song_audio_url($post_id, 'preview');
 
-        // Map events
         $schedules = get_posts(['post_type' => 'lj_schedule', 'posts_per_page' => -1]);
         $matched_events = [];
         foreach($schedules as $sched) {
@@ -595,12 +731,14 @@ function lj_song_dedicated_page_content($content) {
         
         $html = '<div class="lj-dedicated-track" style="max-width: 800px; margin: 0 auto; padding: 40px 20px; font-family: system-ui, sans-serif;">';
         
-        // Header
         $e_badge = $is_explicit ? '<span style="font-size: 12px; font-weight: 800; background: #666; color: #fff; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-left: 10px;" title="Explicit Content">E</span>' : '';
-        $html .= '<h1 style="margin-bottom: 5px; color: #222; display: flex; align-items: center; flex-wrap: wrap;">' . get_the_title() . $e_badge . '</h1>';
+        $html .= '<h1 style="margin-bottom: 5px; color: #222; display: flex; align-items: center; flex-wrap: wrap;">' . esc_html(get_the_title()) . $e_badge . '</h1>';
         $html .= '<h3 style="margin-top:0; color: #555; margin-bottom: 30px;">By ' . esc_html($artist) . '</h3>';
         
-        // Metadata Grid
+        if ($tip_url) {
+            $html .= '<div style="margin-bottom: 30px;"><a href="' . esc_url($tip_url) . '" target="_blank" style="display: inline-block; background: #ffaa00; color: #000; font-weight: 800; padding: 10px 20px; border-radius: 8px; text-decoration: none;"><i class="fa-solid fa-hand-holding-dollar"></i> Tip the Artist</a></div>';
+        }
+        
         $html .= '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; background: #f5f5f5; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 30px;">';
         
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Duration</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . $duration_fmt . '</span></div>';
@@ -610,7 +748,6 @@ function lj_song_dedicated_page_content($content) {
         
         $html .= '</div>';
 
-        // Conditional Audio Player (Full Track vs 30-Second Preview)
         if ($is_royalty_free && $full_audio_url) {
             $html .= '<div style="background: #eef7fc; padding: 20px; border-radius: 12px; border: 1px solid #bce0f4; margin-bottom: 40px; text-align: center;">';
             $html .= '<h4 style="margin: 0 0 15px 0; color: #0073aa; font-weight: 800; font-size: 16px;"><i class="fa-solid fa-unlock" style="margin-right: 5px;"></i> Full Track (Royalty Free)</h4>';
@@ -636,7 +773,6 @@ function lj_song_dedicated_page_content($content) {
             $html .= '</div>';
         }
         
-        // Lyrics
         if ($lyrics) {
             $html .= '<h4 style="margin-top: 30px; font-weight: 800; font-size: 22px;">Lyrics</h4>';
             $html .= '<blockquote style="white-space: pre-wrap; font-style: normal; font-size: 16px; line-height: 1.8; background: #f9f9f9; padding: 30px; border-left: 4px solid #0073aa; border-radius: 0 8px 8px 0; color: #333;">' . esc_html($lyrics) . '</blockquote>';
@@ -665,7 +801,7 @@ function lj_render_tax_select_field($tax, $saved_val, $name, $placeholder) {
         foreach($terms as $t) {
             $existing_slugs[] = $t->slug;
             $sel = in_array($t->slug, $saved_terms) ? 'selected' : '';
-            echo '<option value="' . esc_attr($t->slug) . '" ' . $sel . '>' . esc_html($t->name) . '</option>';
+            echo '<option value="' . esc_attr($t->slug) . '" ' . esc_attr($sel) . '>' . esc_html($t->name) . '</option>';
         }
     }
     
@@ -689,14 +825,25 @@ function lj_add_song_meta_boxes() {
 function lj_song_details_callback( $post ) {
     wp_nonce_field( 'lj_save_song_data', 'lj_song_meta_nonce' );
     $gemini_nonce = wp_create_nonce('lj_gemini_scan_action');
-    $full_audio_url = get_post_meta( $post->ID, 'full_audio_url', true );
+    
+    $full_audio_url = lj_get_song_audio_url($post->ID, 'full');
+    $preview_url    = lj_get_song_audio_url($post->ID, 'preview');
+    $intro_audio_url = lj_get_song_audio_url($post->ID, 'intro');
+    $outro_audio_url = lj_get_song_audio_url($post->ID, 'outro');
+
     $audio_duration = get_post_meta( $post->ID, 'audio_duration', true );
-    $preview_url    = get_post_meta( $post->ID, 'preview_url', true );
     $always_available = get_post_meta( $post->ID, 'lj_always_available', true );
+    $play_globally  = get_post_meta( $post->ID, 'lj_play_globally', true );
     $is_explicit    = get_post_meta( $post->ID, 'lj_is_explicit', true );
     $is_royalty_free = get_post_meta( $post->ID, 'lj_royalty_free', true );
+    $license_override = get_post_meta( $post->ID, 'lj_license_override', true );
     $lyrics         = get_post_meta( $post->ID, 'lj_lyrics', true );
     $custom_banner  = get_post_meta( $post->ID, 'lj_custom_banner_text', true );
+    $tip_url        = get_post_meta( $post->ID, 'lj_tip_url', true );
+
+    $lj_audio_attachment_id = get_post_meta($post->ID, 'lj_audio_attachment_id', true);
+    $lj_intro_attachment_id = get_post_meta($post->ID, 'lj_intro_attachment_id', true);
+    $lj_outro_attachment_id = get_post_meta($post->ID, 'lj_outro_attachment_id', true);
     ?>
     <table class="form-table">
         <tr>
@@ -718,12 +865,37 @@ function lj_song_details_callback( $post ) {
             </td>
         </tr>
         <tr>
+            <th><label>License Override</label></th>
+            <td>
+                <label>
+                    <input type="checkbox" name="lj_license_override" value="1" <?php checked(1, $license_override); ?> />
+                    <strong>Bypass Global Exclusion:</strong> Force this track to remain playable even if "Exclude Licensed Music" is enabled globally in Settings.
+                </label>
+            </td>
+        </tr>
+        <tr>
             <th><label>Availability Override</label></th>
             <td>
                 <label>
                     <input type="checkbox" name="lj_always_available" value="1" <?php checked(1, $always_available); ?> />
                     <strong>Always Available:</strong> This song bypasses schedule rules and event exclusivity locks.
                 </label>
+            </td>
+        </tr>
+        <tr>
+            <th><label>Open Play Global</label></th>
+            <td>
+                <label>
+                    <input type="checkbox" name="lj_play_globally" value="1" <?php checked(1, $play_globally); ?> />
+                    <strong>Play Globally during Open Play:</strong> Prioritize this song in the Auto-DJ during non-scheduled events.
+                </label>
+            </td>
+        </tr>
+        <tr>
+            <th><label>Tip URL (WooCommerce/Venmo)</label></th>
+            <td>
+                <input type="url" name="lj_tip_url" value="<?php echo esc_url($tip_url); ?>" class="regular-text" style="width: 100%;" placeholder="https://yoursite.com/?add-to-cart=123" />
+                <p class="description">Paste a WooCommerce "Add to Cart" link, or a direct Venmo/Ko-fi link. This will automatically generate a gold "Tip Artist" button on the frontend.</p>
             </td>
         </tr>
         <tr>
@@ -736,14 +908,28 @@ function lj_song_details_callback( $post ) {
         <tr><th><label>Network Sync MP3</label></th><td>
             <div style="display: flex; gap: 10px;">
                 <input type="url" id="full_audio_url" name="full_audio_url" value="<?php echo esc_attr($full_audio_url); ?>" style="flex-grow: 1;" readonly />
-                <input type="hidden" id="lj_audio_attachment_id" name="lj_audio_attachment_id" value="" />
+                <input type="hidden" id="lj_audio_attachment_id" name="lj_audio_attachment_id" value="<?php echo esc_attr($lj_audio_attachment_id); ?>" />
                 <button type="button" class="button button-secondary" id="lj_upload_mp3_btn">Select Track MP3</button>
                 <button type="button" class="button button-primary" id="lj_gemini_scan_btn">✨ Analyze Audio</button>
             </div>
-            <p class="description">Clicking <strong>Analyze Audio</strong> will run the file through Gemini 2.5 Pro to auto-assign genres and transcribe the lyrics below.</p>
+            <p class="description">Clicking <strong>Analyze Audio</strong> will run the file through Gemini 2.5 Pro to auto-assign genres, explicit classification variables, and transcribe the lyrics below.</p>
         </td></tr>
         <tr><th><label>Duration (Seconds)</label></th><td><input type="number" id="audio_duration" name="audio_duration" value="<?php echo esc_attr($audio_duration); ?>" readonly /></td></tr>
         <tr><th><label>Frontend Preview URL</label></th><td><input type="url" id="preview_url" name="preview_url" value="<?php echo esc_url($preview_url); ?>" style="width:100%;" /></td></tr>
+        <tr><th><label>Intro Voice Memo (DJ Drop)</label></th><td>
+            <div style="display: flex; gap: 10px;">
+                <input type="url" id="intro_audio_url" name="intro_audio_url" value="<?php echo esc_attr($intro_audio_url); ?>" style="flex-grow: 1;" readonly placeholder="Plays before the song starts..." />
+                <input type="hidden" id="lj_intro_attachment_id" name="lj_intro_attachment_id" value="<?php echo esc_attr($lj_intro_attachment_id); ?>" />
+                <button type="button" class="button button-secondary lj_upload_memo_btn" data-target="intro">Select Intro</button>
+            </div>
+        </td></tr>
+        <tr><th><label>Outro Voice Memo (DJ Drop)</label></th><td>
+            <div style="display: flex; gap: 10px;">
+                <input type="url" id="outro_audio_url" name="outro_audio_url" value="<?php echo esc_attr($outro_audio_url); ?>" style="flex-grow: 1;" readonly placeholder="Plays after the song ends..." />
+                <input type="hidden" id="lj_outro_attachment_id" name="lj_outro_attachment_id" value="<?php echo esc_attr($lj_outro_attachment_id); ?>" />
+                <button type="button" class="button button-secondary lj_upload_memo_btn" data-target="outro">Select Outro</button>
+            </div>
+        </td></tr>
         <tr>
             <th><label>Track Lyrics</label></th>
             <td>
@@ -766,6 +952,18 @@ function lj_song_details_callback( $post ) {
                 if($('#preview_url').val() === '') $('#preview_url').val(attachment.url);
             });
             uploader.open();
+        });
+
+        $('.lj_upload_memo_btn').click(function(e) {
+            e.preventDefault();
+            var target = $(this).data('target');
+            var memoUploader = wp.media({ title: 'Choose Voice Memo', button: { text: 'Select Audio' }, multiple: false, library: { type: 'audio' } });
+            memoUploader.on('select', function() {
+                var attachment = memoUploader.state().get('selection').first().toJSON();
+                $('#lj_' + target + '_attachment_id').val(attachment.id);
+                $('#' + target + '_audio_url').val(attachment.url);
+            });
+            memoUploader.open();
         });
 
         $('#lj_gemini_scan_btn').click(function(e) {
@@ -792,6 +990,7 @@ function lj_song_details_callback( $post ) {
                 if(res.success) {
                     let msg = "Success!";
                     if(res.data.genres) msg += '\nGenres assigned: ' + res.data.genres.join(', ');
+                    if(res.data.explicit_status) msg += '\nRating status: ' + res.data.explicit_status;
                     if(res.data.lyrics_status) msg += '\nLyrics status: ' + res.data.lyrics_status;
                     alert(msg);
                     location.reload(); 
@@ -881,17 +1080,33 @@ function lj_save_custom_meta_data( $post_id ) {
     if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) return;
     if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
-    if ( isset($_POST['lj_song_meta_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['lj_song_meta_nonce'])), 'lj_save_song_data') ) {
+    $post_type = get_post_type($post_id);
+
+    if ( $post_type === 'lj_song' ) {
+        if ( ! isset( $_POST['lj_song_meta_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['lj_song_meta_nonce'] ) ), 'lj_save_song_data' ) ) {
+            return;
+        }
+
         update_option('lj_catalog_version', time());
         
         $always_available = isset($_POST['lj_always_available']) ? 1 : 0;
         update_post_meta($post_id, 'lj_always_available', $always_available);
+        
+        $play_globally = isset($_POST['lj_play_globally']) ? 1 : 0;
+        update_post_meta($post_id, 'lj_play_globally', $play_globally);
         
         $is_explicit = isset($_POST['lj_is_explicit']) ? 1 : 0;
         update_post_meta($post_id, 'lj_is_explicit', $is_explicit);
         
         $is_royalty_free = isset($_POST['lj_royalty_free']) ? 1 : 0;
         update_post_meta($post_id, 'lj_royalty_free', $is_royalty_free);
+        
+        $license_override = isset($_POST['lj_license_override']) ? 1 : 0;
+        update_post_meta($post_id, 'lj_license_override', $license_override);
+        
+        if ( isset($_POST['lj_tip_url']) ) {
+            update_post_meta($post_id, 'lj_tip_url', esc_url_raw(wp_unslash($_POST['lj_tip_url'])));
+        }
         
         if ( isset($_POST['lj_custom_banner_text']) ) {
             update_post_meta($post_id, 'lj_custom_banner_text', wp_kses_post(wp_unslash($_POST['lj_custom_banner_text'])));
@@ -902,19 +1117,52 @@ function lj_save_custom_meta_data( $post_id ) {
         }
         
         if ( isset($_POST['preview_url']) ) update_post_meta($post_id, 'preview_url', esc_url_raw(wp_unslash($_POST['preview_url'])));
-        if ( !empty($_POST['lj_audio_attachment_id']) ) {
+        
+        if ( isset($_POST['lj_audio_attachment_id']) ) {
             $id = intval(wp_unslash($_POST['lj_audio_attachment_id']));
-            $url = wp_get_attachment_url($id);
-            if ($url) {
-                update_post_meta($post_id, 'full_audio_url', esc_url_raw($url));
-                require_once( ABSPATH . 'wp-admin/includes/media.php' );
-                $meta = wp_read_audio_metadata( get_attached_file($id) );
-                if (!empty($meta['length'])) update_post_meta($post_id, 'audio_duration', ceil($meta['length']));
+            if ($id > 0) {
+                update_post_meta($post_id, 'lj_audio_attachment_id', $id);
+                $url = wp_get_attachment_url($id);
+                if ($url) {
+                    update_post_meta($post_id, 'full_audio_url', esc_url_raw($url));
+                    require_once( ABSPATH . 'wp-admin/includes/media.php' );
+                    $meta = wp_read_audio_metadata( get_attached_file($id) );
+                    if (!empty($meta['length'])) update_post_meta($post_id, 'audio_duration', ceil($meta['length']));
+                }
+            } else {
+                delete_post_meta($post_id, 'lj_audio_attachment_id');
+                delete_post_meta($post_id, 'full_audio_url');
             }
         }
-    }
 
-    if ( isset($_POST['lj_schedule_meta_nonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['lj_schedule_meta_nonce'])), 'lj_save_schedule_data') ) {
+        $process_memo = function($attachment_key, $url_key, $duration_key) use ($post_id) {
+            if (isset($_POST[$attachment_key])) {
+                $id = intval(wp_unslash($_POST[$attachment_key]));
+                if ($id > 0) {
+                    update_post_meta($post_id, $attachment_key, $id);
+                    $url = wp_get_attachment_url($id);
+                    if ($url) {
+                        update_post_meta($post_id, $url_key, esc_url_raw($url));
+                        require_once( ABSPATH . 'wp-admin/includes/media.php' );
+                        $meta = wp_read_audio_metadata(get_attached_file($id));
+                        if (!empty($meta['length'])) update_post_meta($post_id, $duration_key, ceil($meta['length']));
+                    }
+                } else {
+                    delete_post_meta($post_id, $attachment_key);
+                    delete_post_meta($post_id, $url_key);
+                    delete_post_meta($post_id, $duration_key);
+                }
+            }
+        };
+
+        $process_memo('lj_intro_attachment_id', 'intro_audio_url', 'intro_duration');
+        $process_memo('lj_outro_attachment_id', 'outro_audio_url', 'outro_duration');
+
+    } elseif ( $post_type === 'lj_schedule' ) {
+        if ( ! isset( $_POST['lj_schedule_meta_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['lj_schedule_meta_nonce'] ) ), 'lj_save_schedule_data' ) ) {
+            return;
+        }
+
         update_option('lj_catalog_version', time());
         
         $days = isset($_POST['lj_days']) ? array_map('sanitize_text_field', wp_unslash($_POST['lj_days'])) : [];
@@ -957,6 +1205,17 @@ function lj_get_explicit_meta_query() {
             'relation' => 'OR',
             ['key' => 'lj_is_explicit', 'compare' => 'NOT EXISTS'],
             ['key' => 'lj_is_explicit', 'value' => '1', 'compare' => '!=']
+        ];
+    }
+    return [];
+}
+
+function lj_get_license_meta_query() {
+    if (get_option('lj_exclude_licensed', 0)) {
+        return [
+            'relation' => 'OR',
+            ['key' => 'lj_royalty_free', 'value' => '1', 'compare' => '='],
+            ['key' => 'lj_license_override', 'value' => '1', 'compare' => '=']
         ];
     }
     return [];
@@ -1152,11 +1411,14 @@ function lj_process_queue_and_get_current($station_id = 'global') {
     
     if ( !$current || $now >= ($current['start_time'] + $current['duration']) ) {
         $history = get_option("lj_play_history_{$station_id}", []);
-        $broadcast_log = get_option('lj_broadcast_log', []);
 
         if ($current) {
             $actual_finish_time = $current['start_time'] + $current['duration'];
             $history[$current['id']] = $actual_finish_time;
+            
+            $month_key = wp_date('Y_m', $actual_finish_time);
+            $month_log_option = 'lj_broadcast_log_' . $month_key;
+            $broadcast_log = get_option($month_log_option, []);
             
             $broadcast_log[] = [
                 'station' => $station_id,
@@ -1168,11 +1430,17 @@ function lj_process_queue_and_get_current($station_id = 'global') {
                 'listeners' => $current['listeners_at_start'] ?? $active_listeners_count
             ];
 
-            foreach($history as $id => $time) if($now - $time > 3600) unset($history[$id]); 
-            foreach($broadcast_log as $k => $entry) if($now - $entry['end_time'] > 30 * DAY_IN_SECONDS) unset($broadcast_log[$k]); 
+            $available_months = get_option('lj_broadcast_log_months', []);
+            if (!in_array($month_key, $available_months)) {
+                $available_months[] = $month_key;
+                rsort($available_months); 
+                update_option('lj_broadcast_log_months', $available_months);
+            }
 
+            update_option($month_log_option, array_values($broadcast_log));
+
+            foreach($history as $id => $time) if($now - $time > 3600) unset($history[$id]); 
             update_option("lj_play_history_{$station_id}", $history);
-            update_option('lj_broadcast_log', array_values($broadcast_log));
         }
 
         $queue = get_transient("lj_active_queue_{$station_id}") ?: [];
@@ -1182,16 +1450,28 @@ function lj_process_queue_and_get_current($station_id = 'global') {
                 if (get_post_meta($qid, 'lj_is_explicit', true)) unset($queue[$qid]);
             }
         }
+
+        if (get_option('lj_exclude_licensed', 0)) {
+            foreach($queue as $qid => $qdata) {
+                if (!get_post_meta($qid, 'lj_royalty_free', true) && !get_post_meta($qid, 'lj_license_override', true)) {
+                    unset($queue[$qid]);
+                }
+            }
+        }
         
         if ( !empty($queue) ) {
             uasort($queue, function($a, $b){ return $a['votes'] == $b['votes'] ? $a['added'] <=> $b['added'] : $b['votes'] <=> $a['votes']; });
             $id = array_key_first($queue); unset($queue[$id]); set_transient("lj_active_queue_{$station_id}", $queue, 12 * HOUR_IN_SECONDS);
             
+            $intro_dur = get_post_meta($id, 'intro_duration', true) ?: 0;
+            $outro_dur = get_post_meta($id, 'outro_duration', true) ?: 0;
+            $song_dur  = get_post_meta($id, 'audio_duration', true) ?: 180;
+
             $current = [
                 'id' => $id, 
                 'start_time' => $now, 
-                'duration' => get_post_meta($id, 'audio_duration', true) ?: 180, 
-                'url' => get_post_meta($id, 'full_audio_url', true),
+                'duration' => $intro_dur + $song_dur + $outro_dur, 
+                'url' => lj_get_song_audio_url($id, 'full'),
                 'listeners_at_start' => $active_listeners_count
             ];
             update_option("lj_now_playing_sync_{$station_id}", $current);
@@ -1203,11 +1483,14 @@ function lj_process_queue_and_get_current($station_id = 'global') {
                 'posts_per_page' => 1, 
                 'orderby' => 'rand', 
                 'post__not_in' => $history_keys, 
-                'meta_query' => [['key' => 'full_audio_url', 'value' => '', 'compare' => '!=']]
+                'meta_query' => []
             ];
             
             $explicit_block = lj_get_explicit_meta_query();
             if (!empty($explicit_block)) $query_args['meta_query'][] = $explicit_block;
+            
+            $license_block = lj_get_license_meta_query();
+            if (!empty($license_block)) $query_args['meta_query'][] = $license_block;
             
             $station_args = lj_get_current_station_args($station_id);
             $is_open_play = ($station_id === 'global' && !lj_get_active_schedule() && !get_option('lj_strict_event_mode'));
@@ -1218,7 +1501,13 @@ function lj_process_queue_and_get_current($station_id = 'global') {
                     $query_args['meta_query'][] = ['key' => 'lj_always_available', 'value' => '1', 'compare' => '='];
                     $fallback = get_posts($query_args);
                 } else {
-                    $fallback = lj_get_open_play_fallback($query_args, $all_schedules);
+                    $global_args = $query_args;
+                    $global_args['meta_query'][] = ['key' => 'lj_play_globally', 'value' => '1', 'compare' => '='];
+                    $fallback = get_posts($global_args);
+                    
+                    if (!$fallback) {
+                        $fallback = lj_get_open_play_fallback($query_args, $all_schedules);
+                    }
                 }
             } else {
                 if (!empty($station_args)) $query_args = array_merge($query_args, $station_args);
@@ -1242,11 +1531,16 @@ function lj_process_queue_and_get_current($station_id = 'global') {
             
             if ($fallback) {
                 $id = $fallback[0]->ID;
+                
+                $intro_dur = get_post_meta($id, 'intro_duration', true) ?: 0;
+                $outro_dur = get_post_meta($id, 'outro_duration', true) ?: 0;
+                $song_dur  = get_post_meta($id, 'audio_duration', true) ?: 180;
+
                 $current = [
                     'id' => $id, 
                     'start_time' => $now, 
-                    'duration' => get_post_meta($id, 'audio_duration', true) ?: 180, 
-                    'url' => get_post_meta($id, 'full_audio_url', true),
+                    'duration' => $intro_dur + $song_dur + $outro_dur, 
+                    'url' => lj_get_song_audio_url($id, 'full'),
                     'listeners_at_start' => $active_listeners_count
                 ];
                 update_option("lj_now_playing_sync_{$station_id}", $current);
@@ -1261,15 +1555,23 @@ function lj_process_queue_and_get_current($station_id = 'global') {
 add_action( 'wp_ajax_lj_vote', 'lj_handle_vote' );
 add_action( 'wp_ajax_nopriv_lj_vote', 'lj_handle_vote' );
 function lj_handle_vote() {
-    if ( $_SERVER['REQUEST_METHOD'] !== 'POST' ) wp_send_json_error('Invalid request method.');
+    if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ) wp_send_json_error('Invalid request method.');
     if ( !isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'lj_frontend_action') ) wp_send_json_error('Security validation failed.');
 
-    $id = isset($_POST['song_id']) ? intval(wp_unslash($_POST['song_id'])) : 0; 
     $station_id = isset($_POST['station']) ? sanitize_text_field(wp_unslash($_POST['station'])) : 'global';
+    if ($station_id !== 'global' && !preg_match('/^station_[a-f0-9]{10}$/', $station_id)) {
+        $station_id = 'global';
+    }
+
+    $id = isset($_POST['song_id']) ? intval(wp_unslash($_POST['song_id'])) : 0; 
     $now = time(); 
     
     if (!get_option('lj_allow_explicit', 1) && get_post_meta($id, 'lj_is_explicit', true)) {
         wp_send_json_error('This track contains explicit content and is currently disabled by the venue.');
+    }
+
+    if (get_option('lj_exclude_licensed', 0) && !get_post_meta($id, 'lj_royalty_free', true) && !get_post_meta($id, 'lj_license_override', true)) {
+        wp_send_json_error('Licensed music is currently disabled globally by the venue.');
     }
     
     if ($station_id === 'global') {
@@ -1307,7 +1609,10 @@ function lj_handle_vote() {
     foreach($user_history as $k => $time) if($now - $time > 3600) unset($user_history[$k]);
     if (count($user_history) >= 10) wp_send_json_error('You have reached your 10-vote limit for this hour on this station.');
     
-    $user_history[] = $now; $_SESSION[$session_key] = $user_history;
+    $user_history[] = $now; 
+    $_SESSION[$session_key] = $user_history;
+    session_write_close(); 
+    
     $queue = get_transient("lj_active_queue_{$station_id}") ?: [];
     if(isset($queue[$id])) $queue[$id]['votes']++; else $queue[$id] = ['votes' => 1, 'added' => $now];
     set_transient("lj_active_queue_{$station_id}", $queue, 12 * HOUR_IN_SECONDS); wp_send_json_success('Vote counted!');
@@ -1316,13 +1621,17 @@ function lj_handle_vote() {
 add_action( 'wp_ajax_lj_get_state', 'lj_get_state' );
 add_action( 'wp_ajax_nopriv_lj_get_state', 'lj_get_state' );
 function lj_get_state() {
-    if ( $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
+    if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
     if ( !isset($_GET['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['security'])), 'lj_frontend_action') ) wp_send_json_error('Security validation failed.');
 
     $now = time(); 
     $lid = isset($_GET['listener_id']) ? sanitize_text_field(wp_unslash($_GET['listener_id'])) : '';
     $is_listening = isset($_GET['is_listening']) ? sanitize_text_field(wp_unslash($_GET['is_listening'])) : 'false';
+    
     $station_id = isset($_GET['station']) ? sanitize_text_field(wp_unslash($_GET['station'])) : 'global';
+    if ($station_id !== 'global' && !preg_match('/^station_[a-f0-9]{10}$/', $station_id)) {
+        $station_id = 'global';
+    }
 
     $listeners = get_option("lj_active_listeners_{$station_id}", []);
     if ($lid) { if($is_listening === 'true') $listeners[$lid] = $now; else unset($listeners[$lid]); }
@@ -1339,7 +1648,7 @@ function lj_get_state() {
         $submitter = !empty($submitter_terms) ? implode(', ', $submitter_terms) : '';
         $banner = !empty($custom_banner) ? $custom_banner : (!empty($submitter) ? 'Submitted by: ' . $submitter : '');
 
-        $fq[] = ['id' => $sid, 'title' => html_entity_decode(get_the_title($sid)), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'lj_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($sid, 'lj_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($sid, 'lj_lyrics', true)), 'banner' => $banner, 'genre' => implode(', ', wp_get_post_terms($sid, 'lj_genre', ['fields' => 'names']) ?: []), 'votes' => $d['votes'], 'preview_url' => get_post_meta($sid, 'preview_url', true), 'url' => get_post_meta($sid, 'full_audio_url', true), 'permalink' => get_permalink($sid) ];
+        $fq[] = ['id' => $sid, 'title' => html_entity_decode(get_the_title($sid)), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'lj_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($sid, 'lj_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($sid, 'lj_lyrics', true)), 'banner' => $banner, 'tip_url' => get_post_meta($sid, 'lj_tip_url', true), 'genre' => implode(', ', wp_get_post_terms($sid, 'lj_genre', ['fields' => 'names']) ?: []), 'votes' => $d['votes'], 'preview_url' => lj_get_song_audio_url($sid, 'preview'), 'url' => lj_get_song_audio_url($sid, 'full'), 'permalink' => get_permalink($sid) ];
     }
     
     $np = null;
@@ -1349,25 +1658,72 @@ function lj_get_state() {
         $submitter_np = !empty($submitter_terms_np) ? implode(', ', $submitter_terms_np) : '';
         $banner_np = !empty($custom_banner_np) ? $custom_banner_np : (!empty($submitter_np) ? 'Submitted by: ' . $submitter_np : '');
 
-        $np = ['id' => $cp['id'], 'title' => html_entity_decode(get_the_title($cp['id'])), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($cp['id'], 'lj_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($cp['id'], 'lj_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($cp['id'], 'lj_lyrics', true)), 'banner' => $banner_np, 'url' => $cp['url'], 'permalink' => get_permalink($cp['id']), 'start_timestamp' => $cp['start_time'], 'duration' => $cp['duration'], 'server_now' => $now ];
+        $np = [
+            'id' => $cp['id'], 
+            'title' => html_entity_decode(get_the_title($cp['id'])), 
+            'artist' => html_entity_decode(implode(', ', wp_get_post_terms($cp['id'], 'lj_artist', ['fields' => 'names']) ?: ['Unknown'])), 
+            'is_explicit' => get_post_meta($cp['id'], 'lj_is_explicit', true) ? true : false, 
+            'has_lyrics' => !empty(get_post_meta($cp['id'], 'lj_lyrics', true)), 
+            'banner' => $banner_np, 
+            'tip_url' => get_post_meta($cp['id'], 'lj_tip_url', true), 
+            'url' => $cp['url'], 
+            'intro_url' => lj_get_song_audio_url($cp['id'], 'intro'),
+            'outro_url' => lj_get_song_audio_url($cp['id'], 'outro'),
+            'intro_duration' => get_post_meta($cp['id'], 'intro_duration', true) ?: 0,
+            'song_duration' => get_post_meta($cp['id'], 'audio_duration', true) ?: 180,
+            'outro_duration' => get_post_meta($cp['id'], 'outro_duration', true) ?: 0,
+            'permalink' => get_permalink($cp['id']), 
+            'start_timestamp' => $cp['start_time'], 
+            'duration' => $cp['duration'], 
+            'server_now' => $now 
+        ];
     }
     $cat_version = get_option('lj_catalog_version', 0);
     
-    wp_send_json_success(['now_playing' => $np, 'queue' => $fq, 'listener_count' => count($listeners), 'catalog_version' => $cat_version, 'station_label' => lj_get_station_label($station_id)]);
+    $all_schedules = get_posts(['post_type' => 'lj_schedule', 'posts_per_page' => -1]);
+    $upcoming_events = [];
+    foreach($all_schedules as $sched) {
+        $next_run = lj_get_next_schedule_timestamp($sched->ID);
+        if ($next_run) {
+            $upcoming_events[] = [
+                'title' => get_the_title($sched->ID),
+                'timestamp' => $next_run,
+                'start_time' => get_post_meta($sched->ID, 'lj_start_time', true),
+                'end_time' => get_post_meta($sched->ID, 'lj_end_time', true)
+            ];
+        }
+    }
+    usort($upcoming_events, function($a, $b) { return $a['timestamp'] <=> $b['timestamp']; });
+    $sliced_events = array_slice($upcoming_events, 0, 20);
+    
+    wp_send_json_success([
+        'now_playing' => $np, 
+        'queue' => $fq, 
+        'listener_count' => count($listeners), 
+        'catalog_version' => $cat_version, 
+        'station_label' => lj_get_station_label($station_id),
+        'upcoming_events' => $sliced_events
+    ]);
 }
 
 add_action( 'wp_ajax_lj_get_catalog', 'lj_get_catalog' );
 add_action( 'wp_ajax_nopriv_lj_get_catalog', 'lj_get_catalog' );
 function lj_get_catalog() {
-    if ( $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
+    if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
     if ( !isset($_GET['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['security'])), 'lj_frontend_action') ) wp_send_json_error('Security validation failed.');
 
     $station_id = isset($_GET['station']) ? sanitize_text_field(wp_unslash($_GET['station'])) : 'global';
+    if ($station_id !== 'global' && !preg_match('/^station_[a-f0-9]{10}$/', $station_id)) {
+        $station_id = 'global';
+    }
     
     $query_args = ['post_type' => 'lj_song', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC', 'meta_query' => []];
     
     $explicit_block = lj_get_explicit_meta_query();
     if (!empty($explicit_block)) $query_args['meta_query'][] = $explicit_block;
+    
+    $license_block = lj_get_license_meta_query();
+    if (!empty($license_block)) $query_args['meta_query'][] = $license_block;
     
     $station_args = lj_get_base_station_args($station_id);
     if (!empty($station_args)) {
@@ -1495,8 +1851,9 @@ function lj_get_catalog() {
             'is_explicit' => $is_explicit,
             'has_lyrics' => $has_lyrics,
             'banner' => $banner,
-            'preview_url' => get_post_meta($p->ID, 'preview_url', true), 
-            'url' => get_post_meta($p->ID, 'full_audio_url', true), 
+            'tip_url' => get_post_meta($p->ID, 'lj_tip_url', true),
+            'preview_url' => lj_get_song_audio_url($p->ID, 'preview'), 
+            'url' => lj_get_song_audio_url($p->ID, 'full'), 
             'permalink' => get_permalink($p->ID),
             'cooldown' => $remaining, 
             'is_playing' => $is_playing,
@@ -1509,7 +1866,7 @@ function lj_get_catalog() {
 }
 
 // ==========================================
-// 5. FRONTEND UI & STYLING
+// 5. FRONTEND UI & STYLING (THEME-HARDENED)
 // ==========================================
 add_shortcode( 'community_radio_jukebox', 'lj_render_frontend_app' );
 function lj_render_frontend_app($atts) {
@@ -1537,11 +1894,6 @@ function lj_render_frontend_app($atts) {
 
     $station_label = lj_get_station_label($station_id);
 
-    wp_enqueue_style( 'lj-fontawesome', LJ_PLUGIN_URL . 'assets/css/all.min.css', [], '6.4.0' );
-    wp_enqueue_style( 'lj-bootstrap', LJ_PLUGIN_URL . 'assets/css/bootstrap.min.css', [], '5.3.0' );
-    wp_enqueue_script( 'lj-bootstrap-js', LJ_PLUGIN_URL . 'assets/js/bootstrap.bundle.min.js', [], '5.3.0', true );
-    wp_enqueue_script( 'lj-three-js', LJ_PLUGIN_URL . 'assets/js/three.min.js', [], '0.155.0', true );
-
     $ajax_url = admin_url( 'admin-ajax.php' );
     $security_nonce = wp_create_nonce( 'lj_frontend_action' );
     $submit_enabled = get_option('lj_enable_submissions') == '1';
@@ -1550,840 +1902,814 @@ function lj_render_frontend_app($atts) {
     ob_start();
     ?>
     <style>
+        /* THEME HARDENING: Scope all core design attributes to explicit ID space */
         :root { --lj-bg: #fff; --lj-text: #222; --lj-panel: rgba(245,245,245,0.92); --lj-border: #ccc; --lj-accent: #0073aa; --lj-sec: #555; }
         [data-theme="dark"] { --lj-bg: #000; --lj-text: #fff; --lj-panel: rgba(10,10,10,0.85); --lj-border: #444; --lj-accent: #3598dc; --lj-sec: #bbb; }
-        .lj-visualizer-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; background: var(--lj-bg); }
-        .lj-app-container { position: relative; z-index: 10; background: var(--lj-panel); color: var(--lj-text); font-family: system-ui, sans-serif; max-width: 460px; margin: 40px auto; padding: 25px; border: 1px solid var(--lj-border); border-radius: 24px; transition: 0.3s; backdrop-filter: blur(15px); box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
-        .lj-track-item { background: var(--lj-panel); border: 1px solid var(--lj-border); padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; transition: opacity 0.3s; }
-        .lj-locked .lj-track-info, .lj-locked .lj-btn-vote { opacity: 0.5; filter: grayscale(0.8); }
-        .lj-locked .lj-btn-vote { pointer-events: none; cursor: not-allowed; }
-        .lj-cooldown-badge { font-size: 10px; font-weight: 800; background: rgba(220, 53, 69, 0.15); color: #dc3545; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 6px; }
-        .lj-explicit-badge { font-size: 9px; font-weight: 800; background: #666; color: #fff; padding: 2px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
-        .lj-genre-badge { font-size: 10px; font-weight: 700; background: var(--lj-accent); color: #fff; padding: 2px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; }
-        .lj-clickable-artist { cursor: pointer; color: var(--lj-accent); transition: opacity 0.2s; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
-        .lj-btn { background: var(--lj-accent); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: transform 0.1s; display: inline-flex; align-items: center; justify-content: center; }
-        .lj-btn-vote { background: #28a745; transition: all 0.2s ease; }
-        .lj-btn-vote.lj-voted { background: #155d27; opacity: 0.7; cursor: default; }
-        .lj-btn-sync { background: #d63638; width: 100%; padding: 18px; border-radius: 50px; animation: pulse 2s infinite; margin-top: 15px; font-size: 17px;}
-        .lj-btn-disconnect { background: var(--lj-sec); width: 100%; padding: 18px; border-radius: 50px; display: none; margin-top: 15px;}
-        .lj-station-badge { font-size: 11px; font-weight: 800; background: var(--lj-accent); color: #fff; padding: 4px 10px; border-radius: 12px; margin-top: 5px; display: inline-block; vertical-align: middle; white-space: nowrap; }
         
-        .lj-marquee-container { width: 100%; overflow: hidden; white-space: nowrap; background: rgba(0,0,0,0.05); border-radius: 6px; margin-top: 10px; padding: 5px 0; box-sizing: border-box; }
-        [data-theme="dark"] .lj-marquee-container { background: rgba(255,255,255,0.05); }
-        .lj-marquee-content { display: inline-block; padding-left: 100%; animation: lj-marquee 12s linear infinite; font-weight: 600; font-size: 12px; color: var(--lj-accent); }
+        #lj-jukebox-root { all: initial; display: block; font-family: system-ui, -apple-system, sans-serif; box-sizing: border-box; }
+        #lj-jukebox-root * { box-sizing: border-box; }
         
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.6); } 70% { box-shadow: 0 0 0 15px rgba(214, 54, 56, 0); } 100% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0); } }
-        @keyframes lj-marquee { 0% { transform: translate(0, 0); } 100% { transform: translate(-100%, 0); } }
+        #lj-jukebox-root .lj-app-container { position: relative; z-index: 10; background: var(--lj-panel); color: var(--lj-text); font-family: inherit; width: 94%; max-width: 480px; margin: 20px auto; padding: 20px; border: 1px solid var(--lj-border); border-radius: 24px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); backdrop-filter: blur(15px); box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+        #lj-jukebox-root .lj-dashboard-grid { display: grid !important; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+        #lj-jukebox-root .lj-dashboard-column { display: flex; flex-direction: column; gap: 15px; }
+
+        #lj-jukebox-root .lj-track-item { background: var(--lj-panel); border: 1px solid var(--lj-border); padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex !important; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; transition: opacity 0.3s; width: 100%; max-width: none; contain: layout; position: relative; box-sizing: border-box; }
+        #lj-jukebox-root .lj-track-info { flex: 1; min-width: 160px; max-width: none; overflow: hidden; }
+        
+        #lj-jukebox-root .lj-locked .lj-track-info, #lj-jukebox-root .lj-locked .lj-btn-vote { opacity: 0.5; filter: grayscale(0.8); }
+        #lj-jukebox-root .lj-locked .lj-btn-vote { pointer-events: none; cursor: not-allowed; }
+        #lj-jukebox-root .lj-cooldown-badge { font-size: 10px; font-weight: 800; background: rgba(220, 53, 69, 0.15); color: #dc3545; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 6px; }
+        #lj-jukebox-root .lj-explicit-badge { font-size: 9px; font-weight: 800; background: #666; color: #fff; padding: 2px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+        #lj-jukebox-root .lj-genre-badge { font-size: 10px; font-weight: 700; background: var(--lj-accent); color: #fff; padding: 2px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; }
+        #lj-jukebox-root .lj-clickable-artist { cursor: pointer; color: var(--lj-accent); transition: opacity 0.2s; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+        #lj-jukebox-root .lj-btn { background: var(--lj-accent); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: transform 0.1s; display: inline-flex; align-items: center; justify-content: center; }
+        #lj-jukebox-root .lj-btn-vote { background: #28a745; transition: all 0.2s ease; }
+        #lj-jukebox-root .lj-btn-vote.lj-voted { background: #155d27; opacity: 0.7; cursor: default; }
+        #lj-jukebox-root .lj-btn-sync { background: #d63638; width: 100%; padding: 18px; border-radius: 50px; animation: lj-pulse 2s infinite; margin-top: 15px; font-size: 17px;}
+        #lj-jukebox-root .lj-btn-disconnect { background: var(--lj-sec); width: 100%; padding: 18px; border-radius: 50px; display: none; margin-top: 15px;}
+        #lj-jukebox-root .lj-station-badge { font-size: 11px; font-weight: 800; background: var(--lj-accent); color: #fff; padding: 4px 10px; border-radius: 12px; margin-top: 5px; display: inline-block; vertical-align: middle; white-space: nowrap; }
+        
+        #lj-jukebox-root .lj-marquee-container { width: 100%; max-width: 100%; overflow: hidden; white-space: nowrap; background: rgba(0,0,0,0.05); border-radius: 6px; margin-top: 10px; padding: 5px 0; box-sizing: border-box; contain: layout paint; position: relative; display: block; }
+        #lj-jukebox-root [data-theme="dark"] .lj-marquee-container { background: rgba(255,255,255,0.05); }
+        #lj-jukebox-root .lj-marquee-content { display: inline-block; padding-left: 100%; animation: lj-marquee 12s linear infinite; font-weight: 600; font-size: 12px; color: var(--lj-accent); }
+        
+        #lj-jukebox-root #lj-schedule-list { max-height: 250px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: var(--lj-border) transparent; }
+        #lj-jukebox-root #lj-schedule-list::-webkit-scrollbar { width: 4px; }
+        #lj-jukebox-root #lj-schedule-list::-webkit-scrollbar-track { background: transparent; }
+        #lj-jukebox-root #lj-schedule-list::-webkit-scrollbar-thumb { background: var(--lj-border); border-radius: 4px; }
+        
+        @keyframes lj-pulse { 0% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.6); } 70% { box-shadow: 0 0 0 15px rgba(214, 54, 56, 0); } 100% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0); } }
+        @keyframes lj-marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
         
         #lj-alert-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: 90%; max-width: 460px; pointer-events: none; }
         #lj-alert-container .alert { pointer-events: auto; font-weight: 600; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: none; }
+
+        @media (min-width: 768px) {
+            #lj-jukebox-root .lj-app-container { max-width: 1140px; width: 92%; padding: 30px; margin: 40px auto; }
+            #lj-jukebox-root .lj-dashboard-grid { display: grid !important; grid-template-columns: 340px 1fr !important; gap: 25px; }
+            #lj-jukebox-root .lj-sticky-pane { position: sticky; top: 100px; max-height: calc(100vh - 120px); overflow-y: auto; scrollbar-width: none; }
+            #lj-jukebox-root .lj-sticky-pane::-webkit-scrollbar { display: none; }
+            #lj-jukebox-root #lj-queue-list, #lj-jukebox-root #lj-catalog-list { display: grid !important; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important; gap: 15px; }
+            #lj-jukebox-root .lj-track-item { margin-bottom: 0; }
+        }
+
+        @media (min-width: 1200px) {
+            #lj-jukebox-root .lj-dashboard-grid { grid-template-columns: 380px 1fr !important; gap: 35px; }
+            #lj-jukebox-root #lj-queue-list, #lj-jukebox-root #lj-catalog-list { grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)) !important; gap: 18px; }
+        }
     </style>
 
-    <div id="lj-visualizer-container" class="lj-visualizer-wrap"></div>
     <div id="lj-alert-container"></div>
 
-    <div class="lj-app-container" id="lj-app-root" data-theme="light">
-        <div style="display:flex; justify-content:space-between; border-bottom:2px solid var(--lj-border); margin-bottom:20px; padding-bottom:10px; align-items:center; flex-wrap:wrap;">
-            <div>
-                <h2 style="margin:0; font-size:22px; display:flex; align-items:center;"><i class="fa-solid fa-radio"></i> <span style="margin-left:8px;">JUKEBOX</span></h2>
-                <div class="lj-station-badge" id="lj-station-badge-text" title="Active Filters"><?php echo esc_html($station_label); ?></div>
-            </div>
-            <div style="display:flex; gap:15px; font-size:20px; color:var(--lj-accent);">
-                <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><i class="fa-solid fa-cloud-arrow-up"></i></a><?php endif; ?>
-                <i class="fa-solid fa-list-ul" id="lj-catalog-toggle" style="cursor:pointer;" title="Toggle Catalog"></i>
-                <i class="fa-solid fa-circle-info" id="lj-info-toggle" style="cursor:pointer;" title="How it works"></i>
-                <div id="lj-theme-toggle" style="cursor:pointer;" title="Toggle Theme"><i class="fa-solid fa-moon"></i></div>
-            </div>
-        </div>
+    <div id="lj-jukebox-root" data-theme="light">
+        <div class="lj-app-container">
 
-        <div id="lj-info-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; margin-bottom:20px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
-            <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--lj-accent);"><i class="fa-solid fa-radio"></i> Community Radio Jukebox</p>
-            <ul style="padding-left:20px; margin-bottom:0;">
-                <li style="margin-bottom:6px;"><strong>Connect:</strong> Lock your audio exactly in sync with everyone else in town.</li>
-                <li style="margin-bottom:6px;"><strong>Visualizer:</strong> Tilt your phone or use WASD keys to navigate the audio-reactive starfield!</li>
-                <li style="margin-bottom:6px;"><strong>Voting:</strong> You get <strong>10 votes per hour</strong>. Use them to boost your favorite tracks.</li>
-                <li style="margin-bottom:6px;"><strong>Offline Mode:</strong> A green checkmark <i class="fa-solid fa-circle-check" style="color:#28a745;"></i> indicates the track is safely cached on your device. The music won't stop if Wi-Fi cuts out!</li>
-            </ul>
-        </div>
-
-        <div class="lj-now-playing" id="lj-np-panel" style="text-align:center; padding:15px; background:var(--lj-panel); border-radius:16px; border-left:6px solid var(--lj-accent); margin-bottom:20px;">
-            <div style="display:flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase;">
-                <span id="lj-np-status-label" style="color: var(--lj-accent);">On Air</span>
-                <span id="lj-listener-count" style="color: var(--lj-accent);"><i class="fa-solid fa-users"></i> 0</span>
-            </div>
-            <h3 id="lj-np-title" style="margin:12px 0 4px 0; font-size: 20px;">Awaiting...</h3>
-            <p id="lj-np-artist" style="margin:0; color: var(--lj-sec); font-weight:600;">...</p>
-            <div id="lj-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--lj-sec);"><i class="fa-solid fa-hourglass-half"></i> --:--</div>
-            
-            <div id="lj-np-banner" style="display:none;" class="lj-marquee-container">
-                <div class="lj-marquee-content" id="lj-np-banner-text"></div>
-            </div>
-
-            <div style="display:flex; gap:10px; margin-top:15px;">
-                <button id="lj-sync-btn" class="lj-btn lj-btn-sync" style="margin-top:0; flex:1;"><i class="fa-solid fa-broadcast-tower"></i> Connect</button>
-                <button id="lj-disconnect-btn" class="lj-btn lj-btn-disconnect" style="margin-top:0; flex:1;">Disconnect</button>
-                <button id="lj-stop-preview-btn" class="lj-btn" style="background:#ffc107; color:#000; flex:1; padding:18px; border-radius:50px; display:none; margin-top:0; font-size:17px;"><i class="fa-solid fa-stop"></i> End Preview</button>
-            </div>
-        </div>
-        
-        <h3 style="font-size:15px; margin-bottom:12px; font-weight:800;">Queue</h3>
-        <ul id="lj-queue-list" style="list-style:none; padding:0;"></ul>
-        
-        <div id="lj-catalog-container">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:35px; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
-                <h3 style="font-size:15px; font-weight:800; margin:0;">Catalog</h3>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <label style="font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; margin:0;">
-                        <input type="checkbox" id="lj-available-only" style="margin:0; cursor:pointer;"> Available Only
-                    </label>
-                    <select id="lj-catalog-sort" style="padding:6px; border-radius:8px; font-size:12px; background:var(--lj-panel); color:inherit; border:1px solid var(--lj-border);">
-                        <option value="title">Title A-Z</option><option value="artist">Artist</option><option value="newest">Newest</option>
-                    </select>
+            <!-- INTRODUCTORY ONBOARDING TUTORIAL INTERFACE OVERLAY -->
+            <div id="lj-tutorial-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; justify-content:center; align-items:center; backdrop-filter:blur(5px);">
+                <div style="background:var(--lj-panel); padding:35px; border-radius:24px; max-width:420px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,0.5); color:var(--lj-text); margin:20px;">
+                    <h3 style="margin-top:0; font-weight:800; color:var(--lj-accent); font-size:22px;"><i class="fa-solid fa-compact-disc fa-spin-pulse"></i> Jukebox Interface Guide</h3>
+                    <p style="font-size:14px; margin-bottom:20px;">Welcome! Use these controllers to manage the system vibe:</p>
+                    <div style="text-align:left; margin:20px 0; font-size:14px; background:rgba(0,0,0,0.04); padding:18px; border-radius:14px;">
+                        <p style="margin-bottom:12px;"><strong><i class="fa-solid fa-broadcast-tower" style="color:#d63638;"></i> Connect:</strong> Wirelessly matches your device audio output exactly in sync with the venue stream.</p>
+                        <p style="margin-bottom:12px;"><strong><i class="fa-solid fa-arrow-up" style="color:#28a745;"></i> Vote Button:</strong> Instantly pushes selected catalog items straight onto the live interactive queue timeline.</p>
+                        <p style="margin-bottom: 0;"><strong><i class="fa-solid fa-play" style="color:var(--lj-sec);"></i> Preview:</strong> Evaluates track acoustics locally with an encapsulated 30-second playback buffer snapshot.</p>
+                    </div>
+                    <button id="lj-tutorial-close" class="lj-btn" style="width:100%; padding:14px; border-radius:12px; font-size:16px;">Get Started</button>
                 </div>
             </div>
-            <div id="lj-artist-filter-header" style="display:none; justify-content:space-between; align-items:center; background:var(--lj-accent); color:#fff; padding:10px 15px; border-radius:12px; margin-bottom:12px;">
-                <span style="font-weight:700; font-size:13px;" id="lj-filter-text">Showing Artist</span>
-                <button onclick="clearArtistFilter()" style="background:rgba(0,0,0,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;"><i class="fa-solid fa-xmark"></i> Clear</button>
+
+            <!-- Header Panel Controls -->
+            <div style="display:flex; justify-content:space-between; border-bottom:2px solid var(--lj-border); margin-bottom:20px; padding-bottom:10px; align-items:center; flex-wrap:wrap; gap: 10px;">
+                <div>
+                    <h2 style="margin:0; font-size:22px; display:flex; align-items:center;"><i class="fa-solid fa-radio"></i> <span style="margin-left:8px;">JUKEBOX</span></h2>
+                    <div class="lj-station-badge" id="lj-station-badge-text" title="Active Filters"><?php echo esc_html($station_label); ?></div>
+                </div>
+                <div style="display:flex; gap:15px; font-size:20px; color:var(--lj-accent);">
+                    <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><i class="fa-solid fa-cloud-arrow-up"></i></a><?php endif; ?>
+                    <i class="fa-solid fa-list-ul" id="lj-catalog-toggle" style="cursor:pointer;" title="Toggle Catalog"></i>
+                    <i class="fa-regular fa-calendar-alt" id="lj-schedule-toggle" style="cursor:pointer;" title="View Schedule"></i>
+                    <i class="fa-solid fa-circle-info" id="lj-info-toggle" style="cursor:pointer;" title="How it works"></i>
+                    <div id="lj-theme-toggle" style="cursor:pointer;" title="Toggle Theme"><i class="fa-solid fa-moon"></i></div>
+                </div>
             </div>
-            <ul id="lj-catalog-list" style="list-style:none; padding:0;"></ul>
+
+            <!-- Dynamic Layout Context Grid -->
+            <div class="lj-dashboard-grid">
+                
+                <div class="lj-dashboard-column lj-sticky-pane">
+                    
+                    <div id="lj-info-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; text-align:left;">
+                        <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--lj-accent);"><i class="fa-solid fa-radio"></i> Community Radio Jukebox</p>
+                        <ul style="padding-left:20px; margin-bottom:0;">
+                            <li style="margin-bottom:6px;"><strong>Connect:</strong> Lock your audio exactly in sync with everyone else in town.</li>
+                            <li style="margin-bottom:6px;"><strong>Voting:</strong> You get <strong>10 votes per hour</strong>. Use them to boost your favorite tracks.</li>
+                            <li style="margin-bottom:6px;"><strong>Offline Mode:</strong> A green checkmark <i class="fa-solid fa-circle-check" style="color:#28a745;"></i> indicates the track is safely cached on your device.</li>
+                        </ul>
+                    </div>
+
+                    <div id="lj-schedule-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; text-align:left;">
+                        <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--lj-border); padding-bottom:10px; margin-bottom:10px;"><i class="fa-regular fa-calendar-alt"></i> Upcoming Events</h3>
+                        <ul style="list-style:none; padding:0; margin:0;" id="lj-schedule-list">
+                            <li style="color:var(--lj-sec); font-style:italic;">Loading schedule...</li>
+                        </ul>
+                    </div>
+
+                    <div class="lj-now-playing" id="lj-np-panel" style="text-align:center; padding:15px; background:var(--lj-panel); border-radius:16px; border-left:6px solid var(--lj-accent);">
+                        <div style="display:flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase;">
+                            <span id="lj-np-status-label" style="color: var(--lj-accent);">On Air</span>
+                            <span id="lj-listener-count" style="color: var(--lj-accent);"><i class="fa-solid fa-users"></i> 0</span>
+                        </div>
+                        <h3 id="lj-np-title" style="margin:12px 0 4px 0; font-size: 20px;">Awaiting...</h3>
+                        <p id="lj-np-artist" style="margin:0; color: var(--lj-sec); font-weight:600;">...</p>
+                        <div id="lj-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--lj-sec);"><i class="fa-solid fa-hourglass-half"></i> --:--</div>
+                        
+                        <div id="lj-np-tip-container" style="display:none; margin: 20px 0 10px 0;">
+                            <a id="lj-np-tip-btn" href="#" target="_blank" class="w-100 btn btn-warning btn-lg" style="background: #ffaa00; color: #000; font-weight: 800; border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.3); transition: transform 0.2s;">
+                                <i class="fa-solid fa-hand-holding-dollar" style="margin-right: 8px;"></i> Tip Active Artist
+                            </a>
+                        </div>
+
+                        <div id="lj-np-banner" style="display:none;" class="lj-marquee-container">
+                            <div class="lj-marquee-content" id="lj-np-banner-text"></div>
+                        </div>
+
+                        <div style="display:flex; gap:10px; margin-top:15px;">
+                            <button id="lj-sync-btn" class="lj-btn lj-btn-sync" style="margin-top:0; flex:1;"><i class="fa-solid fa-broadcast-tower"></i> Connect</button>
+                            <button id="lj-disconnect-btn" class="lj-btn lj-btn-disconnect" style="margin-top:0; flex:1;">Disconnect</button>
+                            <button id="lj-stop-preview-btn" class="lj-btn" style="background:#ffc107; color:#000; flex:1; padding:18px; border-radius:50px; display:none; margin-top:0; font-size:17px;"><i class="fa-solid fa-stop"></i> End Preview</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="lj-dashboard-column">
+                    <div>
+                        <h3 style="font-size:15px; margin-bottom:12px; font-weight:800;">Queue</h3>
+                        <ul id="lj-queue-list" style="list-style:none; padding:0; margin:0;"></ul>
+                    </div>
+                    
+                    <div id="lj-catalog-container">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+                            <h3 style="font-size:15px; font-weight:800; margin:0;">Catalog</h3>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <label style="font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; margin:0;">
+                                    <input type="checkbox" id="lj-available-only" style="margin:0; cursor:pointer;"> Available Only
+                                </label>
+                                <select id="lj-catalog-sort" style="padding:6px; border-radius:8px; font-size:12px; background:var(--lj-panel); color:inherit; border:1px solid var(--lj-border);">
+                                    <option value="title">Title A-Z</option><option value="artist">Artist</option><option value="newest">Newest</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="lj-artist-filter-header" style="display:none; justify-content:space-between; align-items:center; background:var(--lj-accent); color:#fff; padding:10px 15px; border-radius:12px; margin-bottom:12px;">
+                            <span style="font-weight:700; font-size:13px;" id="lj-filter-text">Showing Artist</span>
+                            <button onclick="clearArtistFilter()" style="background:rgba(0,0,0,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;"><i class="fa-solid fa-xmark"></i> Clear</button>
+                        </div>
+                        <ul id="lj-catalog-list" style="list-style:none; padding:0; margin:0;"></ul>
+                    </div>
+                </div>
+
+            </div>
+            
+            <audio id="lj-live-player" style="display:none;" crossorigin="anonymous"></audio>
+            <audio id="lj-preview-player" style="display:none;" crossorigin="anonymous"></audio>
         </div>
-        
-        <audio id="lj-live-player" style="display:none;" crossorigin="anonymous"></audio>
-        <audio id="lj-preview-player" style="display:none;" crossorigin="anonymous"></audio>
     </div>
 
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const root = document.getElementById('lj-app-root'), themeBtn = document.getElementById('lj-theme-toggle');
-        const infoToggleBtn = document.getElementById('lj-info-toggle'), infoPanel = document.getElementById('lj-info-panel');
-        const catalogToggleBtn = document.getElementById('lj-catalog-toggle'), catalogContainer = document.getElementById('lj-catalog-container');
-        const alertContainer = document.getElementById('lj-alert-container');
-        
-        const ajaxUrl = "<?php echo esc_js( $ajax_url ); ?>";
-        const securityNonce = "<?php echo esc_js( $security_nonce ); ?>";
-        const stationId = "<?php echo esc_js( $station_id ); ?>";
+    // WRAPPED ENCAPSULATION TO ASSURE MULTI-THEME RUNTIME COMPATIBILITY AND ROBUST EXECUTION
+    (function($) {
+        function initAppInstance() {
+            console.log("Jukebox DOM Triggered...");
+            const root = document.getElementById('lj-jukebox-root');
+            if(!root) return;
 
-        const live = document.getElementById('lj-live-player'), prev = document.getElementById('lj-preview-player');
-        const syncBtn = document.getElementById('lj-sync-btn'), discBtn = document.getElementById('lj-disconnect-btn'), countDisp = document.getElementById('lj-listener-count');
-        const stopPreviewBtn = document.getElementById('lj-stop-preview-btn');
-
-        const LJ_CACHE_NAME = 'lj-offline-buffer-' + stationId;
-        let cId = null, isSync = false, isOffline = false, catData = [], timer, offlineQueue = [];
-        let lId = localStorage.getItem('lj_l_id') || 'lj_'+Math.random().toString(36).substr(2,9);
-        let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; let currentArtistFilter = null; 
-        localStorage.setItem('lj_l_id', lId);
-
-        const availableOnlyCheckbox = document.getElementById('lj-available-only');
-        const savedAvailableOnly = localStorage.getItem('lj_available_only') === 'true';
-        availableOnlyCheckbox.checked = savedAvailableOnly;
-
-        availableOnlyCheckbox.addEventListener('change', (e) => {
-            localStorage.setItem('lj_available_only', e.target.checked);
-            renderCat();
-        });
-        
-        function escapeHTML(str) {
-            if (typeof str !== 'string') return str;
-            return str.replace(/[&<>'"]/g, function(tag) {
-                const charsToReplace = {
-                    '&': '&amp;',
-                    '<': '&lt;',
-                    '>': '&gt;',
-                    "'": '&#39;',
-                    '"': '&quot;'
-                };
-                return charsToReplace[tag] || tag;
-            });
-        }
-
-        function trackJukeboxEvent(action, name, value = null) {
-            if (typeof window._paq !== 'undefined') {
-                if (value !== null) {
-                    window._paq.push(['trackEvent', 'Jukebox', action, name, value]);
-                } else {
-                    window._paq.push(['trackEvent', 'Jukebox', action, name]);
-                }
-            }
-        }
-
-        function recordSongPlay(title, isPreview = false) {
-            if (isPreview) {
-                trackJukeboxEvent('Preview Track', title);
-            } else {
-                let currentCount = parseInt(sessionStorage.getItem('lj_session_songs') || 0) + 1;
-                sessionStorage.setItem('lj_session_songs', currentCount);
-                trackJukeboxEvent('Play Track', title);
-                trackJukeboxEvent('Session Total Plays', currentCount.toString(), currentCount);
-            }
-        }
-
-        function getVotedSongs() {
-            let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
-            let now = Date.now();
-            let validIds = [];
-            for (let id in votes) {
-                if (now - votes[id] < 3600000) validIds.push(parseInt(id));
-                else delete votes[id];
-            }
-            localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
-            return validIds;
-        }
-
-        function addVotedSong(id) {
-            let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
-            votes[id] = Date.now();
-            localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
-        }
-
-        let cachedUrls = new Set();
-        async function refreshCacheSet() {
-            if (!('caches' in window)) return;
-            const cache = await caches.open(LJ_CACHE_NAME);
-            const keys = await cache.keys();
-            cachedUrls.clear();
-            keys.forEach(req => cachedUrls.add(req.url));
-        }
-        refreshCacheSet(); 
-
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
-
-        if (infoToggleBtn && infoPanel) {
-            infoToggleBtn.onclick = () => { infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none'; };
-        }
-
-        const catalogVisible = localStorage.getItem('lj_catalog_visible') !== 'false';
-        catalogContainer.style.display = catalogVisible ? 'block' : 'none';
-        catalogToggleBtn.style.opacity = catalogVisible ? '1' : '0.5';
-        catalogToggleBtn.onclick = () => {
-            const isHidden = catalogContainer.style.display === 'none';
-            catalogContainer.style.display = isHidden ? 'block' : 'none';
-            localStorage.setItem('lj_catalog_visible', isHidden);
-            catalogToggleBtn.style.opacity = isHidden ? '1' : '0.5';
-        };
-
-        if (stopPreviewBtn) {
-            stopPreviewBtn.onclick = () => { stopPreview(); };
-        }
-
-        function showNotification(message, type = 'danger') {
-            const icon = type === 'danger' ? 'fa-circle-exclamation' : (type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check');
-            const alertHtml = `<div class="alert alert-${type} alert-dismissible fade show" role="alert"><i class="fa-solid ${icon}"></i> ${escapeHTML(message)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
-            alertContainer.insertAdjacentHTML('beforeend', alertHtml);
-            const newAlert = alertContainer.lastElementChild;
-            setTimeout(() => { if (newAlert && newAlert.classList.contains('show')) new bootstrap.Alert(newAlert).close(); }, 4000);
-        }
-
-        function renderQueueUI(queueArray) {
-            let votedIds = getVotedSongs();
-            const ql = document.getElementById('lj-queue-list'); 
-            ql.innerHTML = '';
-            queueArray.forEach(s => {
-                let sTitle = escapeHTML(s.title);
-                let sArtist = escapeHTML(s.artist);
-                let sGenre = escapeHTML(s.genre);
-                let sLink = escapeHTML(s.permalink);
-                
-                let gBadge = s.genre ? ` <span class="lj-genre-badge">${sGenre}</span>` : '';
-                let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
-                let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;" title="Buffered for Offline"></i>` : '';
-                
-                let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
-                
-                let safeVoteTitle = sTitle.replace(/'/g, "\\'");
-                let safeArtistQuote = sArtist.replace(/'/g, "\\'");
-                let safePreviewUrl = escapeHTML(s.preview_url);
-                
-                let bannerHtml = s.banner ? `<div class="lj-marquee-container"><div class="lj-marquee-content">${s.banner}</div></div>` : '';
-                
-                let voteBtnHtml = votedIds.includes(s.id) 
-                    ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i> ${s.votes || 0}</button>`
-                    : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-arrow-up"></i> ${s.votes || 0}</button>`;
-
-                ql.innerHTML += `<li class="lj-track-item"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><p><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span>${gBadge}</p></div><div style="display:flex; gap:8px;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
-            });
-        }
-
-        async function bufferNextTracks(tracks) {
-            if (!('caches' in window)) return;
-            const cache = await caches.open(LJ_CACHE_NAME);
-            let updated = false;
+            const themeBtn = document.getElementById('lj-theme-toggle');
+            const infoToggleBtn = document.getElementById('lj-info-toggle'), infoPanel = document.getElementById('lj-info-panel');
+            const scheduleToggleBtn = document.getElementById('lj-schedule-toggle'), schedulePanel = document.getElementById('lj-schedule-panel');
+            const catalogToggleBtn = document.getElementById('lj-catalog-toggle'), catalogContainer = document.getElementById('lj-catalog-container');
+            const alertContainer = document.getElementById('lj-alert-container');
             
-            for (const song of tracks.slice(0, 5)) {
-                if(song && song.url) {
-                    const response = await cache.match(song.url);
-                    if (!response) { try { await cache.add(song.url); updated = true; } catch(e) { } }
-                }
-                if(song && song.preview_url) {
-                    const responsePrev = await cache.match(song.preview_url);
-                    if (!responsePrev) { try { await cache.add(song.preview_url); updated = true; } catch(e) { } }
+            const ajaxUrl = "<?php echo esc_js( $ajax_url ); ?>";
+            const securityNonce = "<?php echo esc_js( $security_nonce ); ?>";
+            const stationId = "<?php echo esc_js( $station_id ); ?>";
+
+            const live = document.getElementById('lj-live-player'), prev = document.getElementById('lj-preview-player');
+            const syncBtn = document.getElementById('lj-sync-btn'), discBtn = document.getElementById('lj-disconnect-btn'), countDisp = document.getElementById('lj-listener-count');
+            const stopPreviewBtn = document.getElementById('lj-stop-preview-btn');
+
+            // Tutorial Dom Event Handling
+            const tutorialOverlay = document.getElementById('lj-tutorial-overlay');
+            const tutorialClose = document.getElementById('lj-tutorial-close');
+            
+            if (!localStorage.getItem('lj_tutorial_shown')) {
+                tutorialOverlay.style.display = 'flex';
+            }
+            tutorialClose.onclick = function() {
+                tutorialOverlay.style.display = 'none';
+                localStorage.setItem('lj_tutorial_shown', 'true');
+            };
+
+            const LJ_CACHE_NAME = 'lj-offline-buffer-' + stationId;
+            let cId = null, isSync = false, isOffline = false, catData = [], timer, offlineQueue = [];
+            let lId = localStorage.getItem('lj_l_id') || 'lj_'+Math.random().toString(36).substr(2,9);
+            let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
+            localStorage.setItem('lj_l_id', lId);
+
+            const availableOnlyCheckbox = document.getElementById('lj-available-only');
+            const savedAvailableOnly = localStorage.getItem('lj_available_only') === 'true';
+            availableOnlyCheckbox.checked = savedAvailableOnly;
+
+            availableOnlyCheckbox.addEventListener('change', (e) => {
+                localStorage.setItem('lj_available_only', e.target.checked);
+                renderCat();
+            });
+            
+            function escapeHTML(str) {
+                if (typeof str !== 'string') return str;
+                return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+            }
+
+            function trackJukeboxEvent(action, name, value = null) {
+                if (typeof window._paq !== 'undefined') {
+                    if (value !== null) window._paq.push(['trackEvent', 'Jukebox', action, name, value]);
+                    else window._paq.push(['trackEvent', 'Jukebox', action, name]);
                 }
             }
 
-            if (catData && catData.length > 0) {
-                let unCached = catData.filter(s => s.url && !cachedUrls.has(s.url));
-                if (unCached.length > 0) {
-                    unCached = unCached.sort(() => 0.5 - Math.random()).slice(0, 3);
-                    for (const song of unCached) {
-                        try { await cache.add(song.url); updated = true; } catch(e) { }
-                    }
-                }
-            }
-
-            if (updated) {
-                await refreshCacheSet();
-                renderCat(); 
-                if (typeof offlineQueue !== 'undefined') renderQueueUI(offlineQueue); 
-            }
-        }
-
-        let liveBlobUrl = null;
-        let prevBlobUrl = null;
-
-        async function getAndSetCachedAudio(url, audioElement, isPreview = false) {
-            if (!('caches' in window)) return false;
-            const cache = await caches.open(LJ_CACHE_NAME);
-            const response = await cache.match(url);
-            if (response) { 
-                const blob = await response.blob(); 
+            function recordSongPlay(title, isPreview = false) {
                 if (isPreview) {
-                    if (prevBlobUrl) URL.revokeObjectURL(prevBlobUrl);
-                    prevBlobUrl = URL.createObjectURL(blob);
-                    audioElement.src = prevBlobUrl;
+                    trackJukeboxEvent('Preview Track', title);
                 } else {
-                    if (liveBlobUrl) URL.revokeObjectURL(liveBlobUrl);
-                    liveBlobUrl = URL.createObjectURL(blob);
-                    audioElement.src = liveBlobUrl;
-                }
-                return true;
-            }
-            return false;
-        }
-
-        let scene, camera, renderer, particles, analyser, dataArray, audioCtx;
-        function init3D() {
-            if (typeof THREE === 'undefined') {
-                console.warn("Three.js not loaded. Check your assets/js/ folder.");
-                return;
-            }
-            scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true }); renderer.setSize(window.innerWidth, window.innerHeight);
-            document.getElementById('lj-visualizer-container').appendChild(renderer.domElement);
-            const geo = new THREE.BufferGeometry(), count = 1800, pos = new Float32Array(count * 3);
-            for(let i=0; i<count*3; i++) pos[i] = (Math.random()-0.5)*70;
-            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            particles = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x0073aa, size: 0.05, transparent: true, opacity: 0.8 }));
-            scene.add(particles); animate();
-        }
-        function animate() {
-            requestAnimationFrame(animate);
-            let avg = 0; if (analyser) { analyser.getByteFrequencyData(dataArray); avg = dataArray.reduce((a,b)=>a+b)/dataArray.length; }
-            camera.position.x *= 0.95; camera.rotation.y = -camera.position.x * 10;
-            const attr = particles.geometry.attributes.position; const currentSpeed = 0.012 + (avg * 0.0008); 
-            for(let i=0; i<attr.count; i++) { let z = attr.getZ(i); z += currentSpeed; if(z > 5) z = -60; attr.setZ(i, z); }
-            attr.needsUpdate = true; renderer.render(scene, camera);
-        }
-
-        init3D();
-        const savedTheme = localStorage.getItem('lj_theme') || 'light';
-        root.dataset.theme = savedTheme; themeBtn.innerHTML = savedTheme === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
-        
-        themeBtn.onclick = () => { 
-            let t = root.dataset.theme === 'light' ? 'dark' : 'light'; root.dataset.theme = t; localStorage.setItem('lj_theme', t);
-            themeBtn.innerHTML = t === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
-            if (particles) particles.material.color.set(t === 'light' ? 0x0073aa : 0x3598dc);
-        };
-
-        syncBtn.onclick = () => { 
-            if (!audioCtx && !isMobile) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)(); analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256; dataArray = new Uint8Array(analyser.frequencyBinCount);
-                audioCtx.createMediaElementSource(live).connect(analyser); audioCtx.createMediaElementSource(prev).connect(analyser); analyser.connect(audioCtx.destination);
-            }
-            if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            isSync = true; syncBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...'; poll(); 
-        };
-
-        discBtn.onclick = () => { 
-            isSync = false; isOffline = false; live.pause(); live.removeAttribute('src'); live.load(); 
-            if(!isPreviewing) { prev.pause(); prev.removeAttribute('src'); prev.load(); }
-            cId = null; discBtn.style.display = 'none'; syncBtn.style.display = 'block'; 
-            syncBtn.innerHTML = '<i class="fa-solid fa-broadcast-tower"></i> Connect'; poll(); 
-        };
-
-        document.addEventListener("visibilitychange", () => {
-            if (document.visibilityState === "visible" && isSync && live.paused) {
-                poll(); 
-            }
-        });
-
-        if ('mediaSession' in navigator) {
-            navigator.mediaSession.setActionHandler('play', () => {
-                if (isSync) { poll(); live.play().catch(e=>{}); }
-            });
-            navigator.mediaSession.setActionHandler('pause', () => {
-                if (isSync) {
-                    live.pause();
-                    syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                    syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                }
-            });
-        }
-        
-        live.addEventListener('play', () => {
-            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-            if (isSync) { syncBtn.style.display = 'none'; discBtn.style.display = 'block'; }
-        });
-
-        live.onended = async () => {
-            if (isOffline && isSync) {
-                let nextSong = null;
-                
-                if (offlineQueue.length > 0) {
-                    nextSong = offlineQueue.shift();
-                    renderQueueUI(offlineQueue);
-                } 
-                else {
-                    const playableSongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule && s.id !== cId);
-                    if (playableSongs.length > 0) {
-                        nextSong = playableSongs[Math.floor(Math.random() * playableSongs.length)];
-                    }
-                }
-
-                if (nextSong) {
-                    const success = await getAndSetCachedAudio(nextSong.url, live, false);
-                    if (success) {
-                        cId = nextSong.id;
-                        root.dataset.currentSongId = nextSong.id;
-                        
-                        let eBadge = nextSong.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
-                        let sLink = escapeHTML(nextSong.permalink);
-                        let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
-                        
-                        document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                        document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(nextSong.artist)}</span>`;
-                        
-                        let bannerEl = document.getElementById('lj-np-banner');
-                        let bannerTextEl = document.getElementById('lj-np-banner-text');
-                        if (nextSong.banner && !isPreviewing) {
-                            bannerEl.style.display = 'block';
-                            bannerTextEl.innerHTML = nextSong.banner; 
-                        } else {
-                            bannerEl.style.display = 'none';
-                            bannerTextEl.innerHTML = '';
-                        }
-                        
-                        if ('mediaSession' in navigator) {
-                            navigator.mediaSession.metadata = new MediaMetadata({ title: nextSong.title, artist: nextSong.artist, album: 'Community Radio Jukebox' });
-                        }
-                        
-                        recordSongPlay(nextSong.title, false);
-
-                        live.onloadedmetadata = () => {
-                            let dur = Math.floor(live.duration);
-                            if (isNaN(dur)) dur = 180;
-                            live.currentTime = 0; 
-                            clearInterval(timer); 
-                            let localStart = Math.floor(Date.now()/1000);
-                            timer = setInterval(() => {
-                                let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
-                                let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-                                if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:#dc3545;"></i> ${m}:${s}`;
-                                if(rem === 0) clearInterval(timer);
-                            }, 1000);
-                        };
-                        live.play().catch(e => {
-                            syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                            syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                        });
-                    } else {
-                        showNotification('Next track unavailable offline.', 'warning');
-                        live.onended(); 
-                    }
-                } else {
-                    if(catData.length > 0) {
-                        let emergencySongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule);
-                        if(emergencySongs.length > 0) {
-                             nextSong = emergencySongs[Math.floor(Math.random() * emergencySongs.length)];
-                             const s = await getAndSetCachedAudio(nextSong.url, live, false);
-                             if (s) {
-                                 cId = nextSong.id;
-                                 root.dataset.currentSongId = nextSong.id;
-                                 let eBadge = nextSong.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
-                                 let sLink = escapeHTML(nextSong.permalink);
-                                 let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
-                                 
-                                 document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                                 document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(nextSong.artist)}</span>`;
-                                 
-                                 let bannerEl = document.getElementById('lj-np-banner');
-                                 let bannerTextEl = document.getElementById('lj-np-banner-text');
-                                 if (nextSong.banner && !isPreviewing) {
-                                     bannerEl.style.display = 'block';
-                                     bannerTextEl.innerHTML = nextSong.banner; 
-                                 } else {
-                                     bannerEl.style.display = 'none';
-                                     bannerTextEl.innerHTML = '';
-                                 }
-                                 
-                                 live.onloadedmetadata = () => { live.currentTime = 0; live.play().catch(e=>{}); };
-                             }
-                        }
-                    } else {
-                        showNotification('No cached songs available.', 'warning');
-                    }
+                    let currentCount = parseInt(sessionStorage.getItem('lj_session_songs') || 0) + 1;
+                    sessionStorage.setItem('lj_session_songs', currentCount);
+                    trackJukeboxEvent('Play Track', title);
                 }
             }
-        };
 
-        function startClock(dur, start, serv) {
-            clearInterval(timer); let localStart = Math.floor(Date.now()/1000) - (serv - start);
-            timer = setInterval(() => {
-                let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
-                let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-                if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${m}:${s}`;
-                if(rem === 0 && !isOffline) { clearInterval(timer); poll(); }
-            }, 1000);
-        }
-
-        function poll() {
-            fetch(ajaxUrl + '?action=lj_get_state&listener_id=' + lId + '&is_listening=' + isSync + '&security=' + securityNonce + '&station=' + stationId)
-            .then(r => r.json()).then(d => {
-                if(!d.success) return;
-                
-                if (d.data.station_label) {
-                    let badge = document.getElementById('lj-station-badge-text');
-                    if(badge) badge.innerText = escapeHTML(d.data.station_label);
+            function getVotedSongs() {
+                let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
+                let now = Date.now(); let validIds = [];
+                for (let id in votes) {
+                    if (now - votes[id] < 3600000) validIds.push(parseInt(id));
+                    else delete votes[id];
                 }
+                localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
+                return validIds;
+            }
 
-                if (d.data.now_playing === null && d.data.queue.length === 0) {
-                    document.getElementById('lj-np-title').innerText = "Station Empty";
-                    document.getElementById('lj-np-artist').innerHTML = "No tracks found for this criteria.";
-                    document.getElementById('lj-np-banner').style.display = 'none';
-                    return;
-                }
+            function addVotedSong(id) {
+                let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
+                votes[id] = Date.now();
+                localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
+            }
 
-                if (isOffline && isSync) {
-                    showNotification("Connection restored. Re-syncing.", "success");
-                    isOffline = false; cId = null; 
-                    document.getElementById('lj-np-status-label').innerText = 'On Air';
-                    document.getElementById('lj-np-status-label').style.color = '';
-                }
-                countDisp.innerHTML = `<i class="fa-solid fa-users"></i> ${d.data.listener_count}`;
-                
-                if (d.data.catalog_version && d.data.catalog_version > clientCatalogVersion) {
-                    if (clientCatalogVersion !== 0) { loadCat(); if ('caches' in window) caches.delete(LJ_CACHE_NAME); }
-                    clientCatalogVersion = d.data.catalog_version;
-                }
+            let cachedUrls = new Set();
+            async function refreshCacheSet() {
+                if (!('caches' in window)) return;
+                const cache = await caches.open(LJ_CACHE_NAME);
+                const keys = await cache.keys();
+                cachedUrls.clear();
+                keys.forEach(req => cachedUrls.add(req.url));
+            }
+            refreshCacheSet(); 
 
-                if (d.data.queue && d.data.now_playing) {
-                    offlineQueue = d.data.queue.map(s => ({...s})); 
-                    bufferNextTracks([d.data.now_playing, ...d.data.queue]);
-                }
+            if (infoToggleBtn && infoPanel) {
+                infoToggleBtn.onclick = () => { 
+                    infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none'; 
+                    if (schedulePanel) schedulePanel.style.display = 'none';
+                };
+            }
 
-                const np = d.data.now_playing; 
-                window.currentNpData = np ? np : null;
-                if(!np) return;
-                
-                let uiId = root.dataset.currentSongId;
-                if(uiId !== String(np.id) && !isPreviewing) {
-                    root.dataset.currentSongId = np.id;
-                    let eBadge = np.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
-                    let sLink = escapeHTML(np.permalink);
-                    let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
-                    document.getElementById('lj-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
-                    document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(np.artist)}</span>`;
+            if (scheduleToggleBtn && schedulePanel) {
+                scheduleToggleBtn.onclick = () => { 
+                    schedulePanel.style.display = schedulePanel.style.display === 'none' ? 'block' : 'none'; 
+                    if (infoPanel) infoPanel.style.display = 'none';
+                };
+            }
+
+            const catalogVisible = localStorage.getItem('lj_catalog_visible') !== 'false';
+            catalogContainer.style.display = catalogVisible ? 'block' : 'none';
+            catalogToggleBtn.style.opacity = catalogVisible ? '1' : '0.5';
+            catalogToggleBtn.onclick = () => {
+                const isHidden = catalogContainer.style.display === 'none';
+                catalogContainer.style.display = isHidden ? 'block' : 'none';
+                localStorage.setItem('lj_catalog_visible', isHidden);
+                catalogToggleBtn.style.opacity = isHidden ? '1' : '0.5';
+            };
+
+            if (stopPreviewBtn) {
+                stopPreviewBtn.onclick = () => { stopPreview(); };
+            }
+
+            function showNotification(message, type = 'danger') {
+                const icon = type === 'danger' ? 'fa-circle-exclamation' : (type === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check');
+                const alertHtml = `<div class="alert alert-${type} alert-dismissible fade show" role="alert"><i class="fa-solid ${icon}"></i> ${escapeHTML(message)}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>`;
+                alertContainer.insertAdjacentHTML('beforeend', alertHtml);
+                const newAlert = alertContainer.lastElementChild;
+                setTimeout(() => { if (newAlert && newAlert.classList.contains('show')) new bootstrap.Alert(newAlert).close(); }, 4000);
+            }
+
+            function renderQueueUI(queueArray) {
+                let votedIds = getVotedSongs();
+                const ql = document.getElementById('lj-queue-list'); 
+                if(!ql) return;
+                ql.innerHTML = '';
+                queueArray.forEach(s => {
+                    let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
+                    let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
+                    let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;"></i>` : '';
+                    let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
                     
-                    let bannerEl = document.getElementById('lj-np-banner');
-                    let bannerTextEl = document.getElementById('lj-np-banner-text');
-                    if (np.banner) {
-                        bannerEl.style.display = 'block';
-                        bannerTextEl.innerHTML = np.banner; 
-                    } else {
-                        bannerEl.style.display = 'none';
-                        bannerTextEl.innerHTML = '';
+                    let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
+                    let genresArray = s.genre ? s.genre.split(', ') : [];
+                    let gBadge = genresArray.length > 0 ? `<div style="margin-top:6px;">` + genresArray.map(g => `<span class="lj-genre-badge" style="margin-left:0; margin-right:6px;" onclick="viewGenre('${escapeHTML(g).replace(/'/g, "\\'")}')">${escapeHTML(g)}</span>`).join('') + `</div>` : '';
+                    
+                    let voteBtnHtml = votedIds.includes(s.id) 
+                        ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i> ${s.votes || 0}</button>`
+                        : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-arrow-up"></i> ${s.votes || 0}</button>`;
+
+                    ql.innerHTML += `<li class="lj-track-item"><div class="lj-track-info"><h4 style="margin:0 0 5px 0;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><div><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span></div>${gBadge}</div><div style="display:flex; gap:8px; align-items:center;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
+                });
+            }
+
+            async function bufferNextTracks(tracks) {
+                if (!('caches' in window)) return;
+                const cache = await caches.open(LJ_CACHE_NAME); let updated = false;
+                for (const song of tracks.slice(0, 5)) {
+                    if(song && song.url && !cachedUrls.has(song.url)) { try { await cache.add(song.url); updated = true; } catch(e) {} }
+                    if(song && song.preview_url && !cachedUrls.has(song.preview_url)) { try { await cache.add(song.preview_url); updated = true; } catch(e) {} }
+                }
+                if (catData && catData.length > 0) {
+                    let unCached = catData.filter(s => s.url && !cachedUrls.has(s.url));
+                    if (unCached.length > 0) {
+                        unCached = unCached.sort(() => 0.5 - Math.random()).slice(0, 3);
+                        for (const song of unCached) { try { await cache.add(song.url); updated = true; } catch(e) { } }
                     }
-
-                    if ('mediaSession' in navigator) {
-                        navigator.mediaSession.metadata = new MediaMetadata({ title: np.title, artist: np.artist, album: 'Community Radio Jukebox' });
-                    }
-                    
-                    recordSongPlay(np.title, false); 
-                    
-                    startClock(np.duration, np.start_timestamp, np.server_now);
-                    loadCat(); 
                 }
+                if (updated) { await refreshCacheSet(); renderCat(); }
+            }
 
-                if(isSync && prev.paused) {
-                    let offset = np.server_now - np.start_timestamp;
-                    if(cId !== np.id) {
-                        cId = np.id; live.src = np.url;
-                        live.onloadedmetadata = () => { 
-                            if (!isSync) return; 
-                            live.currentTime = offset > 0 ? offset : 0; 
-                            live.play().then(() => { 
-                                syncBtn.style.display = 'none'; discBtn.style.display = 'block'; 
-                            }).catch(e => {
-                                syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                                syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                            }); 
-                        };
-                        live.load();
-                    } else if(live.paused) { 
-                        live.currentTime = offset; 
-                        live.play().then(() => { 
-                            syncBtn.style.display = 'none'; discBtn.style.display = 'block'; 
-                        }).catch(e => {
-                            syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                            syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                        }); 
-                    }
-                    else if(Math.abs(live.currentTime - offset) > 3) live.currentTime = offset;
+            let liveBlobUrl = null, prevBlobUrl = null;
+            async function getAndSetCachedAudio(url, audioElement, isPreview = false) {
+                if (!('caches' in window)) return false;
+                const cache = await caches.open(LJ_CACHE_NAME); const response = await cache.match(url);
+                if (response) { 
+                    const blob = await response.blob(); 
+                    if (isPreview) { if (prevBlobUrl) URL.revokeObjectURL(prevBlobUrl); prevBlobUrl = URL.createObjectURL(blob); audioElement.src = prevBlobUrl; }
+                    else { if (liveBlobUrl) URL.revokeObjectURL(liveBlobUrl); liveBlobUrl = URL.createObjectURL(blob); audioElement.src = liveBlobUrl; }
+                    return true;
                 }
-                
-                renderQueueUI(d.data.queue);
-            })
-            .catch(async (err) => {
-                if (isSync && !isOffline) {
-                    isOffline = true; 
-                    
-                    if (!cId) {
-                        showNotification("Offline Mode active. Starting Local Radio.", "warning");
-                    } else {
-                        showNotification("Connection lost. Switching to Local Buffer.", "warning");
-                    }
+                return false;
+            }
 
-                    document.getElementById('lj-np-status-label').innerText = 'Offline Mode';
-                    document.getElementById('lj-np-status-label').style.color = '#dc3545';
-                    
-                    const currentPlayTime = live.currentTime;
-                    const currentSong = cId ? catData.find(s => s.id === cId) : null;
-                    
-                    if (currentSong && currentSong.url) {
-                        const wasPaused = live.paused;
-                        const success = await getAndSetCachedAudio(currentSong.url, live, false);
-                        if (success) {
-                            live.onloadedmetadata = () => { 
-                                live.currentTime = currentPlayTime || 0; 
-                                if (!wasPaused) {
-                                    live.play().catch(e => {
-                                        syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                                        syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                                    });
-                                } 
-                            };
-                            live.load();
-                        } else {
-                            live.onended();
-                        }
-                    } else {
-                        live.onended();
-                    }
+            const savedTheme = localStorage.getItem('lj_theme') || 'light';
+            root.dataset.theme = savedTheme; themeBtn.innerHTML = savedTheme === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+            themeBtn.onclick = () => { 
+                let t = root.dataset.theme === 'light' ? 'dark' : 'light'; root.dataset.theme = t; localStorage.setItem('lj_theme', t);
+                themeBtn.innerHTML = t === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+            };
+
+            syncBtn.onclick = () => { isSync = true; syncBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...'; poll(); };
+            discBtn.onclick = () => { 
+                isSync = false; isOffline = false; live.pause(); live.removeAttribute('src'); live.load(); 
+                if(!isPreviewing) { prev.pause(); prev.removeAttribute('src'); prev.load(); }
+                cId = null; window.currentPhaseId = null; discBtn.style.display = 'none'; syncBtn.style.display = 'block'; 
+                syncBtn.innerHTML = '<i class="fa-solid fa-broadcast-tower"></i> Connect'; poll(); 
+            };
+
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible" && isSync && live.paused) {
+                    poll(); 
                 }
             });
-        }
 
-        window.viewArtist = (artistName) => {
-            currentArtistFilter = artistName; document.getElementById('lj-filter-text').innerText = 'Showing tracks by: ' + artistName;
-            document.getElementById('lj-artist-filter-header').style.display = 'flex'; renderCat();
-            document.getElementById('lj-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
-        };
-        window.clearArtistFilter = () => { currentArtistFilter = null; document.getElementById('lj-artist-filter-header').style.display = 'none'; renderCat(); };
-
-        function loadCat() { 
-            fetch(ajaxUrl + '?action=lj_get_catalog&security=' + securityNonce + '&station=' + stationId).then(r => r.json()).then(async d => { 
-                if(d.success) { 
-                    catData = d.data.catalog; 
-                    localStorage.setItem('lj_offline_catalog_' + stationId, JSON.stringify(catData));
-                    await refreshCacheSet();
-                    renderCat(); 
-                } 
-            }).catch(async e => {
-                const savedCat = localStorage.getItem('lj_offline_catalog_' + stationId);
-                if (savedCat) {
-                    catData = JSON.parse(savedCat);
-                    await refreshCacheSet();
-                    renderCat();
-                }
-            }); 
-        }
-
-        function renderCat() {
-            const l = document.getElementById('lj-catalog-list'), s = document.getElementById('lj-catalog-sort').value;
-            const showAvailable = availableOnlyCheckbox.checked;
-
-            let sorted = [...catData];
-            if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
-            
-            if (showAvailable) {
-                sorted = sorted.filter(song => song.cooldown <= 0 && !song.is_playing && !song.is_locked_by_schedule);
-            }
-            
-            if(s === 'title') sorted.sort((a,b) => a.title.localeCompare(b.title)); else if(s === 'artist') sorted.sort((a,b) => a.artist.localeCompare(b.artist)); else if(s === 'newest') sorted.sort((a,b) => b.id - a.id);
-            
-            if(sorted.length === 0) { 
-                let emptyMsg = '<li style="padding:15px; text-align:center;">No tracks found.</li>';
-                
-                if (catData.length > 0) {
-                    let targetData = currentArtistFilter ? catData.filter(song => song.artist === currentArtistFilter) : catData;
-                    
-                    if (targetData.length > 0) {
-                        let nextUnlockTs = Infinity;
-                        let nextUnlockMsg = "";
-                        
-                        targetData.forEach(s => {
-                            if (s.cooldown > 0 && !s.is_locked_by_schedule) {
-                                let cdTs = Date.now() + (s.cooldown * 1000);
-                                if (cdTs < nextUnlockTs) {
-                                    nextUnlockTs = cdTs;
-                                    nextUnlockMsg = "Next track available at " + new Date(cdTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                                }
-                            } else if (s.is_locked_by_schedule && s.unlock_timestamp) {
-                                let evTs = s.unlock_timestamp * 1000;
-                                if (evTs < nextUnlockTs) {
-                                    nextUnlockTs = evTs;
-                                    nextUnlockMsg = escapeHTML(s.unlock_msg); 
-                                }
-                            }
-                        });
-
-                        if (window.currentNpData && typeof offlineQueue !== 'undefined' && offlineQueue.length === 0) {
-                            let autoDjCanPlay = catData.some(s => s.cooldown <= 0 && !s.is_locked_by_schedule && s.id != window.currentNpData.id);
-                            if (!autoDjCanPlay) {
-                                let serverEndTime = window.currentNpData.start_timestamp + window.currentNpData.duration;
-                                let localOffset = Date.now() - (window.currentNpData.server_now * 1000);
-                                let localEndsAt = (serverEndTime * 1000) + localOffset;
-                                
-                                if (localEndsAt < nextUnlockTs && localEndsAt > Date.now()) {
-                                    nextUnlockTs = localEndsAt;
-                                    nextUnlockMsg = "Available when current song ends";
-                                }
-                            }
-                        }
-                        
-                        if (nextUnlockTs !== Infinity) {
-                            emptyMsg = `<li style="padding:30px 15px; text-align:center; color:var(--lj-sec); background:var(--lj-panel); border:1px dashed var(--lj-border); border-radius:12px;">
-                                <i class="fa-regular fa-clock" style="font-size:28px; margin-bottom:12px; color:var(--lj-accent);"></i><br>
-                                <strong style="font-size:15px; color:var(--lj-text);">No tracks currently available</strong><br>
-                                <span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--lj-accent); padding:4px 12px; border-radius:12px;">${nextUnlockMsg}</span>
-                            </li>`;
-                        } else {
-                            emptyMsg = '<li style="padding:15px; text-align:center;">No tracks currently available to request.</li>';
-                        }
-                    } else if (currentArtistFilter) {
-                        emptyMsg = '<li style="padding:15px; text-align:center;">No tracks found for this artist.</li>';
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.setActionHandler('play', () => {
+                    if (isSync) { poll(); live.play().catch(e=>{}); }
+                });
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    if (isSync) {
+                        live.pause();
+                        syncBtn.style.display = 'block'; discBtn.style.display = 'none';
+                        syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
                     }
-                }
-                
-                l.innerHTML = emptyMsg; 
-                return; 
-            }
-            
-            l.innerHTML = '';
-            let votedIds = getVotedSongs();
-
-            sorted.forEach(s => {
-                let sTitle = escapeHTML(s.title);
-                let sArtist = escapeHTML(s.artist);
-                let sGenre = escapeHTML(s.genre);
-                let sLink = escapeHTML(s.permalink);
-
-                let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
-                let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
-                
-                if (s.is_locked_by_schedule) {
-                    badge = `<div class="lj-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;"><i class="fa-solid fa-lock"></i> ${escapeHTML(s.unlock_msg)}</div>`;
-                } else if (s.is_playing) {
-                    badge = `<div class="lj-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>`;
-                } else if (s.cooldown > 0) {
-                    badge = `<div class="lj-cooldown-badge"><i class="fa-regular fa-clock"></i> Avail ${new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>`;
-                }
-                
-                let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;" title="Buffered for Offline"></i>` : '';
-                
-                let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
-                
-                let safeVoteTitle = sTitle.replace(/'/g, "\\'");
-                let safeArtistQuote = sArtist.replace(/'/g, "\\'");
-                let safePreviewUrl = escapeHTML(s.preview_url);
-
-                let voteBtnHtml = votedIds.includes(s.id)
-                    ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i></button>`
-                    : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-plus"></i></button>`;
-
-                l.innerHTML += `<li class="lj-track-item ${isLocked ? 'lj-locked' : ''}"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><p><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span></p>${badge}</div><div style="display:flex; gap:8px;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
-            });
-        }
-        
-        function stopPreview() {
-            isPreviewing = false; currentPreviewUrl = ''; prev.pause(); prev.removeAttribute('src');
-            document.getElementById('lj-np-status-label').innerText = isOffline ? 'Offline Mode' : 'On Air';
-            document.getElementById('lj-np-status-label').style.color = isOffline ? '#dc3545' : '';
-            if (stopPreviewBtn) stopPreviewBtn.style.display = 'none';
-            root.dataset.currentSongId = null; 
-            
-            if (isSync) {
-                live.play().catch(e => {
-                    syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                    syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
                 });
             }
             
-            poll(); 
-        }
+            live.addEventListener('play', () => {
+                if (isSync && !isPreviewing) { syncBtn.style.display = 'none'; discBtn.style.display = 'block'; }
+            });
 
-        window.previewSong = async (u, title, artist) => { 
-            if(!u) return; 
-            if(isPreviewing && currentPreviewUrl === u) { stopPreview(); return; }
-            if(isSync) live.pause(); 
-            
-            isPreviewing = true; currentPreviewUrl = u;
-            document.getElementById('lj-np-status-label').innerText = 'Local Broadcast'; document.getElementById('lj-np-status-label').style.color = '#28a745';
-            document.getElementById('lj-np-title').innerText = title; document.getElementById('lj-np-artist').innerHTML = artist;
-            document.getElementById('lj-np-banner').style.display = 'none'; // Hides the marquee during preview
-            if (stopPreviewBtn) stopPreviewBtn.style.display = 'block';
+            live.onended = async () => {
+                if (isSync && !isOffline) poll(); 
+                if (isOffline && isSync) {
+                    let nextSong = null;
+                    if (offlineQueue.length > 0) {
+                        nextSong = offlineQueue.shift();
+                        renderQueueUI(offlineQueue);
+                    } else {
+                        const playableSongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule && s.id !== cId);
+                        if (playableSongs.length > 0) {
+                            nextSong = playableSongs[Math.floor(Math.random() * playableSongs.length)];
+                        }
+                    }
 
-            let playUrl = u;
-            if (isOffline) {
-                const success = await getAndSetCachedAudio(u, prev, true);
-                if (!success) {
-                    showNotification('Preview audio not buffered for offline use.', 'warning');
-                    stopPreview();
-                    return;
+                    if (nextSong) {
+                        const success = await getAndSetCachedAudio(nextSong.url, live, false);
+                        if (success) {
+                            cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
+                            let eBadge = nextSong.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
+                            let sLink = escapeHTML(nextSong.permalink);
+                            let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
+                            
+                            document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
+                            document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(nextSong.artist)}</span>`;
+                            
+                            let tipContainer = document.getElementById('lj-np-tip-container');
+                            let tipBtn = document.getElementById('lj-np-tip-btn');
+                            if (nextSong.tip_url && !isPreviewing) {
+                                tipBtn.href = escapeHTML(nextSong.tip_url); tipContainer.style.display = 'block';
+                            } else {
+                                tipContainer.style.display = 'none';
+                            }
+
+                            let bannerEl = document.getElementById('lj-np-banner');
+                            let bannerTextEl = document.getElementById('lj-np-banner-text');
+                            if (nextSong.banner && !isPreviewing) {
+                                bannerEl.style.display = 'block'; bannerTextEl.innerHTML = nextSong.banner; 
+                            } else {
+                                bannerEl.style.display = 'none'; bannerTextEl.innerHTML = '';
+                            }
+                            
+                            if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: nextSong.title, artist: nextSong.artist }); }
+                            recordSongPlay(nextSong.title, false);
+
+                            live.onloadedmetadata = () => {
+                                let dur = Math.floor(live.duration) || 180;
+                                live.currentTime = 0; clearInterval(timer); 
+                                let localStart = Math.floor(Date.now()/1000);
+                                timer = setInterval(() => {
+                                    let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
+                                    let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
+                                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:#dc3545;"></i> ${m}:${s}`;
+                                    if(rem === 0) clearInterval(timer);
+                                }, 1000);
+                            };
+                            if (!isPreviewing) live.play().catch(e => {});
+                        } else {
+                            showNotification('Next track unavailable offline.', 'warning');
+                            live.onended(); 
+                        }
+                    } else {
+                        if(catData.length > 0) {
+                            let emergencySongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule);
+                            if(emergencySongs.length > 0) {
+                                 nextSong = emergencySongs[Math.floor(Math.random() * emergencySongs.length)];
+                                 const s = await getAndSetCachedAudio(nextSong.url, live, false);
+                                 if (s) {
+                                     cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
+                                     document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title); 
+                                     document.getElementById('lj-np-artist').innerHTML = escapeHTML(nextSong.artist);
+                                     live.onloadedmetadata = () => { live.currentTime = 0; if(!isPreviewing) live.play().catch(e=>{}); };
+                                 }
+                            }
+                        }
+                    }
                 }
-            } else {
-                prev.src = u;
+            };
+
+            function startClock(dur, start, serv) {
+                clearInterval(timer); let localStart = Math.floor(Date.now()/1000) - (serv - start);
+                timer = setInterval(() => {
+                    let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
+                    let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
+                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${m}:${s}`;
+                    if(rem === 0 && !isOffline) { clearInterval(timer); poll(); }
+                }, 1000);
             }
 
-            recordSongPlay(title, true); 
+            function poll() {
+                fetch(ajaxUrl + '?action=lj_get_state&listener_id=' + lId + '&is_listening=' + isSync + '&security=' + securityNonce + '&station=' + stationId)
+                .then(r => r.json()).then(d => {
+                    if(!d.success) return;
+                    
+                    if (d.data.upcoming_events) {
+                        const sl = document.getElementById('lj-schedule-list');
+                        if (sl) {
+                            if (d.data.upcoming_events.length === 0) {
+                                sl.innerHTML = '<li style="color:var(--lj-sec); font-style:italic;">No upcoming events scheduled. Enjoy Open Play!</li>';
+                            } else {
+                                sl.innerHTML = '';
+                                d.data.upcoming_events.forEach(ev => {
+                                    let startTs = parseInt(ev.timestamp);
+                                    let sParts = ev.start_time.split(':');
+                                    let eParts = ev.end_time.split(':');
+                                    let sMins = (parseInt(sParts[0]) * 60) + parseInt(sParts[1]);
+                                    let eMins = (parseInt(eParts[0]) * 60) + parseInt(eParts[1]);
+                                    
+                                    if (eMins < sMins) { eMins += 1440; }
+                                    let endTs = startTs + ((eMins - sMins) * 60);
 
-            prev.play().catch(e=>{}); 
-            prev.ontimeupdate = () => { 
-                if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-stopwatch" style="color:#28a745;"></i> 0:${(rem<0?0:rem).toString().padStart(2,'0')}`; }
-                if(prev.currentTime >= 30) stopPreview();
-            }; 
-        };
-        
-        window.voteSong = (id, title) => { 
-            const f = new FormData(); 
-            f.append('action', 'lj_vote'); 
-            f.append('song_id', id); 
-            f.append('security', securityNonce); 
-            f.append('station', stationId);
-            
-            fetch(ajaxUrl, { method: 'POST', body: f }).then(r => r.json()).then(d => { 
-                if(!d.success) showNotification(d.data, 'danger'); 
-                else { 
-                    addVotedSong(id);
-                    trackJukeboxEvent('Vote Track', title); 
-                    showNotification('Vote added!', 'success'); 
-                    poll(); loadCat(); 
+                                    let startD = new Date(startTs * 1000);
+                                    let endD = new Date(endTs * 1000);
+                                    let formatTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                                    let timeFmt = formatTime(startD) + ' - ' + formatTime(endD);
+                                    
+                                    let today = new Date();
+                                    let isToday = startD.getDate() === today.getDate() && startD.getMonth() === today.getMonth() && startD.getFullYear() === today.getFullYear();
+                                    let dayLabel = isToday ? 'Today' : startD.toLocaleDateString([], { weekday: 'long' });
+
+                                    sl.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
+                                        <div>
+                                            <strong style="display:block; color:var(--lj-accent); font-size:14px;">${escapeHTML(ev.title)}</strong>
+                                            <span style="color:var(--lj-sec); font-size:12px;">${timeFmt}</span>
+                                        </div>
+                                        <div style="background:var(--lj-panel); padding:4px 10px; border-radius:8px; font-weight:700; font-size:11px; border:1px solid var(--lj-border);">
+                                            ${dayLabel}
+                                        </div>
+                                    </li>`;
+                                });
+                            }
+                        }
+                    }
+
+                    if (d.data.station_label) {
+                        let badge = document.getElementById('lj-station-badge-text');
+                        if(badge) badge.innerText = d.data.station_label;
+                    }
+                    countDisp.innerHTML = `<i class="fa-solid fa-users"></i> ${d.data.listener_count}`;
+                    
+                    if (d.data.catalog_version && d.data.catalog_version > clientCatalogVersion) {
+                        if (clientCatalogVersion !== 0) { loadCat(); if ('caches' in window) caches.delete(LJ_CACHE_NAME); }
+                        clientCatalogVersion = d.data.catalog_version;
+                    }
+
+                    if (d.data.queue && d.data.now_playing) {
+                        offlineQueue = d.data.queue.map(s => ({...s})); 
+                        bufferNextTracks([d.data.now_playing, ...d.data.queue]);
+                    }
+
+                    const np = d.data.now_playing; window.currentNpData = np ? np : null;
+                    if (d.data.now_playing === null && d.data.queue.length === 0) {
+                        document.getElementById('lj-np-title').innerText = "Station Empty";
+                        document.getElementById('lj-np-artist').innerHTML = "No tracks found.";
+                        document.getElementById('lj-np-tip-container').style.display = 'none';
+                        document.getElementById('lj-np-banner').style.display = 'none';
+                        return;
+                    }
+                    
+                    if (isOffline && isSync) {
+                        showNotification("Connection restored. Re-syncing.", "success");
+                        isOffline = false; cId = null; window.currentPhaseId = null;
+                        document.getElementById('lj-np-status-label').innerText = 'On Air';
+                    }
+                    
+                    if(!np) return;
+
+                    if(root.dataset.currentSongId !== String(np.id) && !isPreviewing) {
+                        root.dataset.currentSongId = np.id;
+                        let eBadge = np.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
+                        let sLink = escapeHTML(np.permalink);
+                        let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
+                        document.getElementById('lj-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
+                        document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(np.artist)}</span>`;
+                        
+                        let tipContainer = document.getElementById('lj-np-tip-container');
+                        let tipBtn = document.getElementById('lj-np-tip-btn');
+                        if (np.tip_url && !isPreviewing) {
+                            tipBtn.href = escapeHTML(np.tip_url); tipContainer.style.display = 'block';
+                        } else {
+                            tipContainer.style.display = 'none';
+                        }
+
+                        let bannerEl = document.getElementById('lj-np-banner');
+                        let bannerTextEl = document.getElementById('lj-np-banner-text');
+                        if (np.banner) {
+                            bannerEl.style.display = 'block'; bannerTextEl.innerHTML = np.banner; 
+                        } else {
+                            bannerEl.style.display = 'none';
+                        }
+
+                        if ('mediaSession' in navigator) { navigator.mediaSession.metadata = new MediaMetadata({ title: np.title, artist: np.artist }); }
+                        recordSongPlay(np.title, false); 
+                        startClock(np.duration, np.start_timestamp, np.server_now);
+                        loadCat(); 
+                    }
+
+                    if(isSync && prev.paused) {
+                        let offset = np.server_now - np.start_timestamp;
+                        let iDur = parseFloat(np.intro_duration) || 0;
+                        let sDur = parseFloat(np.song_duration) || 0;
+                        let oDur = parseFloat(np.outro_duration) || 0;
+
+                        let activeUrl = np.url; let activeOffset = offset; let targetPhase = 'song';
+
+                        if (iDur > 0 && offset < iDur) {
+                            activeUrl = np.intro_url; activeOffset = offset; targetPhase = 'intro';
+                        } else if (offset < iDur + sDur) {
+                            activeUrl = np.url; activeOffset = offset - iDur; targetPhase = 'song';
+                        } else if (oDur > 0 && offset < iDur + sDur + oDur) {
+                            activeUrl = np.outro_url; activeOffset = offset - iDur - sDur; targetPhase = 'outro';
+                        }
+
+                        let phaseId = np.id + '_' + targetPhase;
+
+                        if(window.currentPhaseId !== phaseId) {
+                            window.currentPhaseId = phaseId; cId = np.id; 
+                            live.src = activeUrl;
+                            live.onloadedmetadata = () => { 
+                                if (!isSync) return; 
+                                live.currentTime = activeOffset > 0 ? activeOffset : 0; 
+                                if (!isPreviewing) {
+                                    live.play().then(() => { 
+                                        if(syncBtn) syncBtn.style.display = 'none'; 
+                                        if(discBtn) discBtn.style.display = 'block'; 
+                                    }).catch(e => {});
+                                }
+                            };
+                            live.load();
+                        } else if(live.paused && !isPreviewing) { 
+                            live.currentTime = activeOffset; 
+                            live.play().then(() => { 
+                                if(syncBtn) syncBtn.style.display = 'none'; if(discBtn) discBtn.style.display = 'block'; 
+                            }).catch(e => {}); 
+                        } else if(Math.abs(live.currentTime - activeOffset) > 3) {
+                            live.currentTime = activeOffset;
+                        }
+                    }
+                    if (!isPreviewing && isSync) {
+                        if (syncBtn) syncBtn.style.display = 'none';
+                        if (discBtn) discBtn.style.display = 'block';
+                    }
+                    renderQueueUI(d.data.queue);
+                })
+                .catch(async (err) => {
+                    if (isSync && !isOffline) {
+                        isOffline = true; 
+                        showNotification("Connection lost. Switching to Local Buffer.", "warning");
+                        document.getElementById('lj-np-status-label').innerText = 'Offline Mode';
+                        
+                        const currentPlayTime = live.currentTime;
+                        const currentSong = cId ? catData.find(s => s.id === cId) : null;
+                        
+                        if (currentSong && currentSong.url) {
+                            const wasPaused = live.paused;
+                            const success = await getAndSetCachedAudio(currentSong.url, live, false);
+                            if (success) {
+                                live.onloadedmetadata = () => { 
+                                    live.currentTime = currentPlayTime || 0; 
+                                    if (!wasPaused && !isPreviewing) live.play().catch(e => {});
+                                };
+                                live.load();
+                            } else {
+                                live.onended();
+                            }
+                        } else {
+                            live.onended();
+                        }
+                    }
+                });
+            }
+
+            let currentArtistFilter = null, currentGenreFilter = null;
+            window.viewArtist = (artistName) => { currentArtistFilter = artistName; currentGenreFilter = null; document.getElementById('lj-filter-text').innerText = 'Showing tracks by: ' + artistName; document.getElementById('lj-artist-filter-header').style.display = 'flex'; renderCat(); };
+            window.viewGenre = (genreName) => { currentGenreFilter = genreName; currentArtistFilter = null; document.getElementById('lj-filter-text').innerText = 'Showing genre: ' + genreName; document.getElementById('lj-artist-filter-header').style.display = 'flex'; renderCat(); };
+            window.clearArtistFilter = () => { currentArtistFilter = null; currentGenreFilter = null; document.getElementById('lj-artist-filter-header').style.display = 'none'; renderCat(); };
+
+            function loadCat() { 
+                fetch(ajaxUrl + '?action=lj_get_catalog&security=' + securityNonce + '&station=' + stationId).then(r => r.json()).then(async d => { 
+                    if(d.success) { catData = d.data.catalog; localStorage.setItem('lj_offline_catalog_' + stationId, JSON.stringify(catData)); await refreshCacheSet(); renderCat(); } 
+                }).catch(async e => {
+                    const savedCat = localStorage.getItem('lj_offline_catalog_' + stationId);
+                    if (savedCat) { catData = JSON.parse(savedCat); await refreshCacheSet(); renderCat(); }
+                }); 
+            }
+
+            function renderCat() {
+                const l = document.getElementById('lj-catalog-list'), s = document.getElementById('lj-catalog-sort').value;
+                const showAvailable = availableOnlyCheckbox.checked;
+                if(!l) return;
+                
+                let sorted = [...catData];
+                if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
+                if (currentGenreFilter) sorted = sorted.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
+                if (showAvailable) sorted = sorted.filter(song => song.cooldown <= 0 && !song.is_playing && !song.is_locked_by_schedule);
+                if(s === 'title') sorted.sort((a,b) => a.title.localeCompare(b.title)); else if(s === 'artist') sorted.sort((a,b) => a.artist.localeCompare(b.artist)); else if(s === 'newest') sorted.sort((a,b) => b.id - a.id);
+                
+                if(sorted.length === 0) { 
+                    let emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found.</li>';
+                    if (catData.length > 0) {
+                        let targetData = [...catData];
+                        if (currentArtistFilter) targetData = targetData.filter(song => song.artist === currentArtistFilter);
+                        if (currentGenreFilter) targetData = targetData.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
+                        
+                        if (targetData.length > 0) {
+                            let nextUnlockTs = Infinity; let nextUnlockMsg = "";
+                            targetData.forEach(s => {
+                                if (s.cooldown > 0 && !s.is_locked_by_schedule) {
+                                    let cdTs = Date.now() + (s.cooldown * 1000);
+                                    if (cdTs < nextUnlockTs) { nextUnlockTs = cdTs; nextUnlockMsg = "Next track available at " + new Date(cdTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+                                } else if (s.is_locked_by_schedule && s.unlock_timestamp) {
+                                    let evTs = s.unlock_timestamp * 1000;
+                                    if (evTs < nextUnlockTs) { nextUnlockTs = evTs; nextUnlockMsg = escapeHTML(s.unlock_msg); }
+                                }
+                            });
+                            
+                            if (nextUnlockTs !== Infinity) {
+                                emptyMsg = `<li style="padding:30px 15px; text-align:center; color:var(--lj-sec); background:var(--lj-panel); border:1px dashed var(--lj-border); border-radius:12px; grid-column: 1 / -1;">
+                                    <i class="fa-regular fa-clock" style="font-size:28px; margin-bottom:12px; color:var(--lj-accent);"></i><br>
+                                    <strong style="font-size:15px;">No tracks currently available</strong><br>
+                                    <span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--lj-accent); padding:4px 12px; border-radius:12px;">${nextUnlockMsg}</span>
+                                </li>`;
+                            }
+                        }
+                    }
+                    l.innerHTML = emptyMsg; return; 
                 }
-            }).catch(e => showNotification('Cannot vote offline.', 'warning')); 
-        };
-        
-        poll(); loadCat(); setInterval(loadCat, 60000); setInterval(poll, 5000);
-        document.getElementById('lj-catalog-sort').onchange = renderCat;
-    });
+                
+                l.innerHTML = '';
+                let votedIds = getVotedSongs();
+
+                sorted.forEach(s => {
+                    let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
+                    let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
+                    let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
+                    
+                    if (s.is_locked_by_schedule) {
+                        badge = `<div class="lj-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;"><i class="fa-solid fa-lock"></i> ${escapeHTML(s.unlock_msg)}</div>`;
+                    } else if (s.is_playing) {
+                        badge = `<div class="lj-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>`;
+                    } else if (s.cooldown > 0) {
+                        badge = `<div class="lj-cooldown-badge"><i class="fa-regular fa-clock"></i> Avail ${new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>`;
+                    }
+                    
+                    let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;"></i>` : '';
+                    let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
+                    
+                    let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
+                    let genresArray = s.genre ? s.genre.split(', ') : [];
+                    let gBadge = genresArray.length > 0 ? `<div style="margin-top: 6px;">` + genresArray.map(g => `<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer;" onclick="viewGenre('${escapeHTML(g).replace(/'/g, "\\'")}')">${escapeHTML(g)}</span>`).join('') + `</div>` : '';
+
+                    let voteBtnHtml = votedIds.includes(s.id) ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i></button>` : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-plus"></i></button>`;
+
+                    l.innerHTML += `<li class="lj-track-item ${isLocked ? 'lj-locked' : ''}"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><div><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span></div>${badge}${gBadge}</div><div style="display:flex; gap:8px; align-items: center;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
+                });
+            }
+
+            window.previewSong = async (u, title, artist) => { 
+                if(!u) return; if(isPreviewing && currentPreviewUrl === u) { stopPreview(); return; }
+                if(isSync) live.pause(); 
+                
+                isPreviewing = true; currentPreviewUrl = u;
+                document.getElementById('lj-np-status-label').innerText = 'Local Broadcast'; document.getElementById('lj-np-status-label').style.color = '#28a745';
+                document.getElementById('lj-np-title').innerText = title; document.getElementById('lj-np-artist').innerHTML = artist;
+                document.getElementById('lj-np-tip-container').style.display = 'none'; 
+                if (document.getElementById('lj-np-banner')) document.getElementById('lj-np-banner').style.display = 'none';
+                
+                if (stopPreviewBtn) stopPreviewBtn.style.display = 'block';
+                if (syncBtn) syncBtn.style.display = 'none'; if (discBtn) discBtn.style.display = 'none';
+
+                if (isOffline) {
+                    const success = await getAndSetCachedAudio(u, prev, true);
+                    if (!success) { stopPreview(); return; }
+                } else {
+                    prev.src = u;
+                }
+                recordSongPlay(title, true); prev.play().catch(e=>{}); 
+                prev.ontimeupdate = () => { 
+                    if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-stopwatch" style="color:#28a745;"></i> 0:${(rem<0?0:rem).toString().padStart(2,'0')}`; }
+                    if(prev.currentTime >= 30) stopPreview();
+                }; 
+            };
+            
+            function stopPreview() {
+                isPreviewing = false; currentPreviewUrl = ''; prev.pause(); prev.removeAttribute('src');
+                document.getElementById('lj-np-status-label').innerText = isOffline ? 'Offline Mode' : 'On Air';
+                document.getElementById('lj-np-status-label').style.color = isOffline ? '#dc3545' : '';
+                if (stopPreviewBtn) stopPreviewBtn.style.display = 'none';
+                root.dataset.currentSongId = null; 
+                if (isSync) { live.play().catch(e => {}); } else { syncBtn.style.display = 'block'; }
+                poll(); 
+            }
+
+            window.voteSong = (id, title) => { 
+                const f = new FormData(); f.append('action', 'lj_vote'); f.append('song_id', id); f.append('security', securityNonce); f.append('station', stationId);
+                fetch(ajaxUrl, { method: 'POST', body: f }).then(r => r.json()).then(d => { 
+                    if(!d.success) showNotification(d.data, 'danger'); 
+                    else { addVotedSong(id); trackJukeboxEvent('Vote Track', title); showNotification('Vote added!', 'success'); poll(); loadCat(); }
+                }).catch(e => showNotification('Cannot vote offline.', 'warning')); 
+            };
+            
+            poll(); loadCat(); setInterval(loadCat, 60000); setInterval(poll, 5000);
+            document.getElementById('lj-catalog-sort').onchange = renderCat;
+        }
+
+        // HEAL INITIATION LAG ACROSS DIFFERENT TEMPLATE BUILDS
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAppInstance);
+        } else {
+            initAppInstance();
+        }
+    })(jQuery);
     </script>
     <?php
     return ob_get_clean();
