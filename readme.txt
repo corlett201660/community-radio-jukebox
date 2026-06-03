@@ -12,8 +12,9 @@ An interactive, synchronized community radio engine featuring Gemini AI curation
 
 == Description ==
 
-NOTE: REQUIRES BOOTSTRAP COMPATABLE THEME. 
+NOTE: REQUIRES BOOTSTRAP COMPATABLE THEME and the Font Awesome Plugin 
 https://them.es/starter-bootstrap/
+https://wordpress.org/plugins/font-awesome/
 
 Community Radio Jukebox is a sophisticated WordPress-based audio engine designed to transform static music libraries into an interactive, synchronized "broadcast" experience for hospitality venues, bars, and community spaces. It enforces a global "master clock," ensuring every listener—regardless of geographical location or device—hears the exact same beat at the same time. 
 
@@ -27,7 +28,6 @@ Major features include:
 * **Democratic Queue & Predictive UI:** Gives listeners 10 votes per hour to boost their favorite tracks. Advanced "Predictive Empty States" tell patrons exactly when a song will cool down or become available.
 * **Venue Compliance & Safety:** Instantly filter out Explicit [E] tracks during family hours. Export a comprehensive 30-Day Broadcast Log (CSV) with one click to easily handle ASCAP, BMI, and SESAC royalty reporting.
 * **Dedicated Lyric Pages:** Generates distraction-free track pages with full lyrics, metadata, and 30-second audio previews (or full-track playback for Royalty-Free music) to drive organic SEO traffic to your venue's site.
-* **Audio-Reactive Visualizer:** Features a high-performance Three.js 3D starfield that reacts to the live frequency data of the music.
 
 == External Services ==
 
