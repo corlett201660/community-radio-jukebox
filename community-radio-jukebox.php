@@ -33,7 +33,6 @@ class LJ_Asset_Manager {
         global $post;
         
         if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'community_radio_jukebox' ) ) {
-            wp_enqueue_style( 'lj-fontawesome', LJ_PLUGIN_URL . 'assets/css/all.min.css', [], '6.4.0' );
             wp_enqueue_style( 'lj-bootstrap', LJ_PLUGIN_URL . 'assets/css/bootstrap.min.css', [], '5.3.0' );
             wp_enqueue_script( 'lj-bootstrap-js', LJ_PLUGIN_URL . 'assets/js/bootstrap.bundle.min.js', [], '5.3.0', true );
         }
@@ -659,7 +658,7 @@ function lj_song_dedicated_page_content($content) {
         $html .= '<h3 style="margin-top:0; color: #555; margin-bottom: 30px;">By ' . esc_html($artist) . '</h3>';
         
         if ($tip_url) {
-            $html .= '<div style="margin-bottom: 30px;"><a href="' . esc_url($tip_url) . '" target="_blank" style="display: inline-block; background: #ffaa00; color: #000; font-weight: 800; padding: 10px 20px; border-radius: 8px; text-decoration: none;"><i class="fa-solid fa-hand-holding-dollar"></i> Tip the Artist</a></div>';
+            $html .= '<div style="margin-bottom: 30px;"><a href="' . esc_url($tip_url) . '" target="_blank" style="display: inline-flex; align-items: center; background: #ffaa00; color: #000; font-weight: 800; padding: 10px 20px; border-radius: 8px; text-decoration: none;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Tip the Artist</a></div>';
         }
         
         $html .= '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; background: #f5f5f5; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 30px;">';
@@ -671,7 +670,7 @@ function lj_song_dedicated_page_content($content) {
 
         if ($is_royalty_free && $full_audio_url) {
             $html .= '<div style="background: #eef7fc; padding: 20px; border-radius: 12px; border: 1px solid #bce0f4; margin-bottom: 40px; text-align: center;">';
-            $html .= '<h4 style="margin: 0 0 15px 0; color: #0073aa; font-weight: 800; font-size: 16px;"><i class="fa-solid fa-unlock" style="margin-right: 5px;"></i> Full Track (Royalty Free)</h4>';
+            $html .= '<h4 style="margin: 0 0 15px 0; color: #0073aa; font-weight: 800; font-size: 16px; display:flex; justify-content:center; align-items:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg> Full Track (Royalty Free)</h4>';
             $html .= '<audio controls controlsList="nodownload" src="' . esc_url($full_audio_url) . '" style="width: 100%; max-width: 400px; outline: none; border-radius: 8px;"></audio>';
             $html .= '</div>';
         } elseif ($preview_url) {
@@ -1842,6 +1841,8 @@ function lj_render_frontend_app($atts) {
         
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.6); } 70% { box-shadow: 0 0 0 15px rgba(214, 54, 56, 0); } 100% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0); } }
         @keyframes lj-marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+        @keyframes lj-spin { 100% { transform: rotate(360deg); } }
+        .lj-spin { animation: lj-spin 1s linear infinite; }
         
         #lj-alert-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: 90%; max-width: 460px; pointer-events: none; }
         #lj-alert-container .alert { pointer-events: auto; font-weight: 600; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: none; }
@@ -1874,15 +1875,18 @@ function lj_render_frontend_app($atts) {
     <div class="lj-app-container" id="lj-app-root" data-theme="light">
         <div style="display:flex; justify-content:space-between; border-bottom:2px solid var(--lj-border); margin-bottom:20px; padding-bottom:10px; align-items:center; flex-wrap:wrap; gap: 10px;">
             <div>
-                <h2 style="margin:0; font-size:22px; display:flex; align-items:center;"><i class="fa-solid fa-radio"></i> <span style="margin-left:8px;">JUKEBOX</span></h2>
+                <h2 style="margin:0; font-size:22px; display:flex; align-items:center;">
+                    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> 
+                    <span style="margin-left:8px;">JUKEBOX</span>
+                </h2>
                 <div class="lj-station-badge" id="lj-station-badge-text" title="Active Filters"><?php echo esc_html($station_label); ?></div>
             </div>
             <div style="display:flex; gap:15px; font-size:20px; color:var(--lj-accent);">
-                <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><i class="fa-solid fa-cloud-arrow-up"></i></a><?php endif; ?>
-                <i class="fa-solid fa-list-ul" id="lj-catalog-toggle" style="cursor:pointer;" title="Toggle Catalog"></i>
-                <i class="fa-regular fa-calendar-alt" id="lj-schedule-toggle" style="cursor:pointer;" title="View Schedule"></i>
-                <i class="fa-solid fa-circle-info" id="lj-info-toggle" style="cursor:pointer;" title="How it works"></i>
-                <div id="lj-theme-toggle" style="cursor:pointer;" title="Toggle Theme"><i class="fa-solid fa-moon"></i></div>
+                <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></a><?php endif; ?>
+                <div id="lj-catalog-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Toggle Catalog"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></div>
+                <div id="lj-schedule-toggle" style="cursor:pointer; display:flex; align-items:center;" title="View Schedule"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
+                <div id="lj-info-toggle" style="cursor:pointer; display:flex; align-items:center;" title="How it works"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
+                <div id="lj-theme-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Toggle Theme"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></div>
             </div>
         </div>
 
@@ -1891,16 +1895,16 @@ function lj_render_frontend_app($atts) {
             <div class="lj-dashboard-column lj-sticky-pane">
                 
                 <div id="lj-info-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
-                    <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--lj-accent);"><i class="fa-solid fa-radio"></i> Community Radio Jukebox</p>
+                    <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--lj-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> Community Radio Jukebox</p>
                     <ul style="padding-left:20px; margin-bottom:0;">
                         <li style="margin-bottom:6px;"><strong>Connect:</strong> Lock your audio exactly in sync with everyone else in town.</li>
                         <li style="margin-bottom:6px;"><strong>Voting:</strong> You get <strong>10 votes per hour</strong>. Use them to boost your favorite tracks.</li>
-                        <li style="margin-bottom:6px;"><strong>Offline Mode:</strong> A green checkmark <i class="fa-solid fa-circle-check" style="color:#28a745;"></i> indicates the track is safely cached on your device.</li>
+                        <li style="margin-bottom:6px;"><strong>Offline Mode:</strong> A green checkmark <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#28a745; vertical-align:-0.125em;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> indicates the track is safely cached on your device.</li>
                     </ul>
                 </div>
 
                 <div id="lj-schedule-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
-                    <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--lj-border); padding-bottom:10px; margin-bottom:10px;"><i class="fa-regular fa-calendar-alt"></i> Upcoming Events</h3>
+                    <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--lj-border); padding-bottom:10px; margin-bottom:10px; display:flex; align-items:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Upcoming Events</h3>
                     <ul style="list-style:none; padding:0; margin:0;" id="lj-schedule-list">
                         <li style="color:var(--lj-sec); font-style:italic;">Loading schedule...</li>
                     </ul>
@@ -1909,15 +1913,15 @@ function lj_render_frontend_app($atts) {
                 <div class="lj-now-playing" id="lj-np-panel" style="text-align:center; padding:15px; background:var(--lj-panel); border-radius:16px; border-left:6px solid var(--lj-accent);">
                     <div style="display:flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase;">
                         <span id="lj-np-status-label" style="color: var(--lj-accent);">On Air</span>
-                        <span id="lj-listener-count" style="color: var(--lj-accent);"><i class="fa-solid fa-users"></i> 0</span>
+                        <span id="lj-listener-count" style="color: var(--lj-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> 0</span>
                     </div>
                     <h3 id="lj-np-title" style="margin:12px 0 4px 0; font-size: 20px;">Awaiting...</h3>
                     <p id="lj-np-artist" style="margin:0; color: var(--lj-sec); font-weight:600;">...</p>
-                    <div id="lj-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--lj-sec);"><i class="fa-solid fa-hourglass-half"></i> --:--</div>
+                    <div id="lj-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--lj-sec); display:flex; align-items:center; justify-content:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M12 2v20"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.5 3.5a10 10 0 0 0 0 13"></path><path d="M18.5 3.5a10 10 0 0 1 0 13"></path></svg> --:--</div>
                     
                     <div id="lj-np-tip-container" style="display:none; margin: 20px 0 10px 0;">
-                        <a id="lj-np-tip-btn" href="#" target="_blank" class="w-100 btn btn-warning btn-lg" style="background: #ffaa00; color: #000; font-weight: 800; border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.3); transition: transform 0.2s;">
-                            <i class="fa-solid fa-hand-holding-dollar" style="margin-right: 8px;"></i> Tip Active Artist
+                        <a id="lj-np-tip-btn" href="#" target="_blank" class="w-100 btn btn-warning btn-lg" style="display:flex; justify-content:center; align-items:center; background: #ffaa00; color: #000; font-weight: 800; border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.3); transition: transform 0.2s;">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Tip Active Artist
                         </a>
                     </div>
 
@@ -1926,9 +1930,9 @@ function lj_render_frontend_app($atts) {
                     </div>
 
                     <div style="display:flex; gap:10px; margin-top:15px;">
-                        <button id="lj-sync-btn" class="lj-btn lj-btn-sync" style="margin-top:0; flex:1;"><i class="fa-solid fa-broadcast-tower"></i> Connect</button>
+                        <button id="lj-sync-btn" class="lj-btn lj-btn-sync" style="margin-top:0; flex:1;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M12 2v20"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.5 3.5a10 10 0 0 0 0 13"></path><path d="M18.5 3.5a10 10 0 0 1 0 13"></path></svg> Connect</button>
                         <button id="lj-disconnect-btn" class="lj-btn lj-btn-disconnect" style="margin-top:0; flex:1;">Disconnect</button>
-                        <button id="lj-stop-preview-btn" class="lj-btn" style="background:#ffc107; color:#000; flex:1; padding:18px; border-radius:50px; display:none; margin-top:0; font-size:17px;"><i class="fa-solid fa-stop"></i> End Preview</button>
+                        <button id="lj-stop-preview-btn" class="lj-btn" style="background:#ffc107; color:#000; flex:1; padding:18px; border-radius:50px; display:none; margin-top:0; font-size:17px;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><rect x="6" y="6" width="12" height="12"></rect></svg> End Preview</button>
                     </div>
                 </div>
             </div>
@@ -1953,7 +1957,7 @@ function lj_render_frontend_app($atts) {
                     </div>
                     <div id="lj-artist-filter-header" style="display:none; justify-content:space-between; align-items:center; background:var(--lj-accent); color:#fff; padding:10px 15px; border-radius:12px; margin-bottom:12px;">
                         <span style="font-weight:700; font-size:13px;" id="lj-filter-text">Showing Artist</span>
-                        <button onclick="clearArtistFilter()" style="background:rgba(0,0,0,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;"><i class="fa-solid fa-xmark"></i> Clear</button>
+                        <button onclick="clearArtistFilter()" style="display:flex; align-items:center; background:rgba(0,0,0,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Clear</button>
                     </div>
                     <ul id="lj-catalog-list" style="list-style:none; padding:0; margin:0;"></ul>
                 </div>
@@ -1998,35 +2002,47 @@ function lj_render_frontend_app($atts) {
                 localStorage.setItem('lj_available_only', e.target.checked);
                 renderCat();
             });
+
+                        const svgs = {
+                moon: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
+                sun: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>',
+                users: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>',
+                broadcast: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><path d="M12 2v20"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.5 3.5a10 10 0 0 0 0 13"></path><path d="M18.5 3.5a10 10 0 0 1 0 13"></path></svg>',
+                play: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
+                playLg: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
+                checkCircle: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#28a745; margin-left:5px;" title="Buffered for Offline"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+                file: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>',
+                arrowUp: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>',
+                check: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+                clock: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>',
+                lock: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+                stopwatch: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#28a745; margin-right:6px;"><circle cx="12" cy="13" r="8"></circle><polyline points="12 9 12 13 14 15"></polyline><line x1="12" y1="1" x2="12" y2="3"></line></svg>',
+                alertTriangle: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+                alertCircle: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
+                successCheck: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+                spinner: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lj-spin" style="margin-right:8px;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>',
+                plus: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>'
+            };
+
             
             function escapeHTML(str) {
                 if (typeof str !== 'string') return str;
                 return str.replace(/[&<>'"]/g, function(tag) {
-                    const charsToReplace = {
-                        '&': '&amp;',
-                        '<': '&lt;',
-                        '>': '&gt;',
-                        "'": '&#39;',
-                        '"': '&quot;'
-                    };
+                    const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
                     return charsToReplace[tag] || tag;
                 });
             }
 
             function trackJukeboxEvent(action, name, value = null) {
                 if (typeof window._paq !== 'undefined') {
-                    if (value !== null) {
-                        window._paq.push(['trackEvent', 'Jukebox', action, name, value]);
-                    } else {
-                        window._paq.push(['trackEvent', 'Jukebox', action, name]);
-                    }
+                    if (value !== null) { window._paq.push(['trackEvent', 'Jukebox', action, name, value]); } 
+                    else { window._paq.push(['trackEvent', 'Jukebox', action, name]); }
                 }
             }
 
             function recordSongPlay(title, isPreview = false) {
-                if (isPreview) {
-                    trackJukeboxEvent('Preview Track', title);
-                } else {
+                if (isPreview) { trackJukeboxEvent('Preview Track', title); } 
+                else {
                     let currentCount = parseInt(sessionStorage.getItem('lj_session_songs') || 0) + 1;
                     sessionStorage.setItem('lj_session_songs', currentCount);
                     trackJukeboxEvent('Play Track', title);
@@ -2088,14 +2104,12 @@ function lj_render_frontend_app($atts) {
                 catalogToggleBtn.style.opacity = isHidden ? '1' : '0.5';
             };
 
-            if (stopPreviewBtn) {
-                stopPreviewBtn.onclick = () => { stopPreview(); };
-            }
+            if (stopPreviewBtn) { stopPreviewBtn.onclick = () => { stopPreview(); }; }
 
             function showNotification(message, type) {
                 var alertType = type ? type : 'danger';
-                var icon = alertType === 'danger' ? 'fa-circle-exclamation' : (alertType === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-check');
-                var alertHtml = '<div class="alert alert-' + alertType + ' alert-dismissible fade show" role="alert"><i class="fa-solid ' + icon + '"></i> ' + escapeHTML(message) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
+                var icon = alertType === 'danger' ? svgs.alertTriangle : (alertType === 'warning' ? svgs.alertCircle : svgs.successCheck);
+                var alertHtml = '<div class="alert alert-' + alertType + ' alert-dismissible fade show" role="alert">' + icon + escapeHTML(message) + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>';
                 alertContainer.insertAdjacentHTML('beforeend', alertHtml);
                 var newAlert = alertContainer.lastElementChild;
                 setTimeout(function() { 
@@ -2116,10 +2130,9 @@ function lj_render_frontend_app($atts) {
                     let sArtist = escapeHTML(s.artist);
                     let sLink = escapeHTML(s.permalink);
                     
-                    let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
-                    let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;" title="Buffered for Offline"></i>` : '';
-                    
-                    let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
+                    let eBadge = s.is_explicit ? '<span class="lj-explicit-badge" title="Explicit Content">E</span>' : '';
+                    let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
+                    let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
                     
                     let safeVoteTitle = sTitle.replace(/'/g, "\\'");
                     let safeArtistQuote = sArtist.replace(/'/g, "\\'");
@@ -2127,14 +2140,14 @@ function lj_render_frontend_app($atts) {
                     
                     let genresArray = s.genre ? s.genre.split(', ') : [];
                     let gBadge = genresArray.length > 0 
-                        ? `<div style="margin-top: 6px;">` + genresArray.map(g => `<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre('${escapeHTML(g).replace(/'/g, "\\'")}')">${escapeHTML(g)}</span>`).join('') + `</div>`
+                        ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>'
                         : '';
                     
                     let voteBtnHtml = votedIds.includes(s.id) 
-                        ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i> ${s.votes || 0}</button>`
-                        : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-arrow-up"></i> ${s.votes || 0}</button>`;
+                        ? '<button class="lj-btn lj-btn-vote lj-voted" disabled>' + svgs.check + ' ' + (s.votes || 0) + '</button>'
+                        : '<button class="lj-btn lj-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.arrowUp + ' ' + (s.votes || 0) + '</button>';
 
-                    ql.innerHTML += `<li class="lj-track-item"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span></div>${gBadge}</div><div style="display:flex; gap:8px; align-items: center;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
+                    ql.innerHTML += '<li class="lj-track-item"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="lj-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
                 });
             }
 
@@ -2195,28 +2208,26 @@ function lj_render_frontend_app($atts) {
             }
 
             const savedTheme = localStorage.getItem('lj_theme') || 'light';
-            root.dataset.theme = savedTheme; themeBtn.innerHTML = savedTheme === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+            root.dataset.theme = savedTheme; themeBtn.innerHTML = savedTheme === 'light' ? svgs.moon : svgs.sun;
             
             themeBtn.onclick = () => { 
                 let t = root.dataset.theme === 'light' ? 'dark' : 'light'; root.dataset.theme = t; localStorage.setItem('lj_theme', t);
-                themeBtn.innerHTML = t === 'light' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+                themeBtn.innerHTML = t === 'light' ? svgs.moon : svgs.sun;
             };
 
             syncBtn.onclick = () => { 
-                isSync = true; syncBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Connecting...'; poll(); 
+                isSync = true; syncBtn.innerHTML = svgs.spinner + ' Connecting...'; poll(); 
             };
 
             discBtn.onclick = () => { 
                 isSync = false; isOffline = false; live.pause(); live.removeAttribute('src'); live.load(); 
                 if(!isPreviewing) { prev.pause(); prev.removeAttribute('src'); prev.load(); }
                 cId = null; window.currentPhaseId = null; discBtn.style.display = 'none'; syncBtn.style.display = 'block'; 
-                syncBtn.innerHTML = '<i class="fa-solid fa-broadcast-tower"></i> Connect'; poll(); 
+                syncBtn.innerHTML = svgs.broadcast + ' Connect'; poll(); 
             };
 
             document.addEventListener("visibilitychange", () => {
-                if (document.visibilityState === "visible" && isSync && live.paused) {
-                    poll(); 
-                }
+                if (document.visibilityState === "visible" && isSync && live.paused) { poll(); }
             });
 
             if ('mediaSession' in navigator) {
@@ -2227,7 +2238,7 @@ function lj_render_frontend_app($atts) {
                     if (isSync) {
                         live.pause();
                         syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                        syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
+                        syncBtn.innerHTML = svgs.playLg + ' Resume Sync';
                     }
                 });
             }
@@ -2241,81 +2252,59 @@ function lj_render_frontend_app($atts) {
                 
                 if (isOffline && isSync) {
                     let nextSong = null;
-                    
                     if (offlineQueue.length > 0) {
                         nextSong = offlineQueue.shift();
                         renderQueueUI(offlineQueue);
-                    } 
-                    else {
+                    } else {
                         const playableSongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule && s.id !== cId);
-                        if (playableSongs.length > 0) {
-                            nextSong = playableSongs[Math.floor(Math.random() * playableSongs.length)];
-                        }
+                        if (playableSongs.length > 0) { nextSong = playableSongs[Math.floor(Math.random() * playableSongs.length)]; }
                     }
 
                     if (nextSong) {
                         const success = await getAndSetCachedAudio(nextSong.url, live, false);
                         if (success) {
-                            cId = nextSong.id;
-                            root.dataset.currentSongId = nextSong.id;
+                            cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
                             
-                            let eBadge = nextSong.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
+                            let eBadge = nextSong.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
                             let sLink = escapeHTML(nextSong.permalink);
-                            let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
+                            let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
                             
                             document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                            document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(nextSong.artist)}</span>`;
+                            document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
                             
                             let tipContainer = document.getElementById('lj-np-tip-container');
                             let tipBtn = document.getElementById('lj-np-tip-btn');
                             if (nextSong.tip_url && !isPreviewing) {
-                                tipBtn.href = escapeHTML(nextSong.tip_url);
-                                tipContainer.style.display = 'block';
-                                tipBtn.style.transform = 'scale(1.03)';
-                                setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
-                            } else {
-                                tipContainer.style.display = 'none';
-                            }
+                                tipBtn.href = escapeHTML(nextSong.tip_url); tipContainer.style.display = 'block';
+                                tipBtn.style.transform = 'scale(1.03)'; setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
+                            } else { tipContainer.style.display = 'none'; }
 
-                            let bannerEl = document.getElementById('lj-np-banner');
-                            let bannerTextEl = document.getElementById('lj-np-banner-text');
+                            let bannerEl = document.getElementById('lj-np-banner'), bannerTextEl = document.getElementById('lj-np-banner-text');
                             if (nextSong.banner && !isPreviewing) {
-                                bannerEl.style.display = 'block';
-                                bannerTextEl.innerHTML = nextSong.banner; 
-                            } else {
-                                bannerEl.style.display = 'none';
-                                bannerTextEl.innerHTML = '';
-                            }
+                                bannerEl.style.display = 'block'; bannerTextEl.innerHTML = nextSong.banner; 
+                            } else { bannerEl.style.display = 'none'; bannerTextEl.innerHTML = ''; }
                             
-                            if ('mediaSession' in navigator) {
-                                navigator.mediaSession.metadata = new MediaMetadata({ title: nextSong.title, artist: nextSong.artist, album: 'Community Radio Jukebox' });
-                            }
-                            
+                            if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: nextSong.title, artist: nextSong.artist, album: 'Community Radio Jukebox' });
                             recordSongPlay(nextSong.title, false);
 
                             live.onloadedmetadata = () => {
-                                let dur = Math.floor(live.duration);
-                                if (isNaN(dur)) dur = 180;
-                                live.currentTime = 0; 
-                                clearInterval(timer); 
+                                let dur = Math.floor(live.duration); if (isNaN(dur)) dur = 180;
+                                live.currentTime = 0; clearInterval(timer); 
                                 let localStart = Math.floor(Date.now()/1000);
                                 timer = setInterval(() => {
                                     let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
                                     let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-                                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half" style="color:#dc3545;"></i> ${m}:${s}`;
+                                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
                                     if(rem === 0) clearInterval(timer);
                                 }, 1000);
                             };
                             if (!isPreviewing) {
                                 live.play().catch(e => {
                                     syncBtn.style.display = 'block'; discBtn.style.display = 'none';
-                                    syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
+                                    syncBtn.innerHTML = svgs.playLg + ' Resume Sync';
                                 });
                             }
-                        } else {
-                            showNotification('Next track unavailable offline.', 'warning');
-                            live.onended(); 
-                        }
+                        } else { showNotification('Next track unavailable offline.', 'warning'); live.onended(); }
                     } else {
                         if(catData.length > 0) {
                             let emergencySongs = catData.filter(s => s.url && cachedUrls.has(s.url) && !s.is_locked_by_schedule);
@@ -2323,42 +2312,18 @@ function lj_render_frontend_app($atts) {
                                  nextSong = emergencySongs[Math.floor(Math.random() * emergencySongs.length)];
                                  const s = await getAndSetCachedAudio(nextSong.url, live, false);
                                  if (s) {
-                                     cId = nextSong.id;
-                                     root.dataset.currentSongId = nextSong.id;
-                                     let eBadge = nextSong.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
+                                     cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
+                                     let eBadge = nextSong.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
                                      let sLink = escapeHTML(nextSong.permalink);
-                                     let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
+                                     let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
                                      
                                      document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                                     document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(nextSong.artist)}</span>`;
-                                     
-                                     let tipContainer = document.getElementById('lj-np-tip-container');
-                                     let tipBtn = document.getElementById('lj-np-tip-btn');
-                                     if (nextSong.tip_url && !isPreviewing) {
-                                         tipBtn.href = escapeHTML(nextSong.tip_url);
-                                         tipContainer.style.display = 'block';
-                                         tipBtn.style.transform = 'scale(1.03)';
-                                         setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
-                                     } else {
-                                         tipContainer.style.display = 'none';
-                                     }
-                                     
-                                     let bannerEl = document.getElementById('lj-np-banner');
-                                     let bannerTextEl = document.getElementById('lj-np-banner-text');
-                                     if (nextSong.banner && !isPreviewing) {
-                                         bannerEl.style.display = 'block';
-                                         bannerTextEl.innerHTML = nextSong.banner; 
-                                     } else {
-                                         bannerEl.style.display = 'none';
-                                         bannerTextEl.innerHTML = '';
-                                     }
+                                     document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
                                      
                                      live.onloadedmetadata = () => { live.currentTime = 0; if(!isPreviewing) live.play().catch(e=>{}); };
                                  }
                             }
-                        } else {
-                            showNotification('No cached songs available.', 'warning');
-                        }
+                        } else { showNotification('No cached songs available.', 'warning'); }
                     }
                 }
             };
@@ -2368,7 +2333,7 @@ function lj_render_frontend_app($atts) {
                 timer = setInterval(() => {
                     let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
                     let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-hourglass-half"></i> ${m}:${s}`;
+                    if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
                     if(rem === 0 && !isOffline) { clearInterval(timer); poll(); }
                 }, 1000);
             }
@@ -2386,17 +2351,12 @@ function lj_render_frontend_app($atts) {
                             } else {
                                 sl.innerHTML = '';
                                 d.data.upcoming_events.forEach(ev => {
-                                    let startTs = parseInt(ev.timestamp);
-                                    let sParts = ev.start_time.split(':');
-                                    let eParts = ev.end_time.split(':');
-                                    let sMins = (parseInt(sParts[0]) * 60) + parseInt(sParts[1]);
-                                    let eMins = (parseInt(eParts[0]) * 60) + parseInt(eParts[1]);
-                                    
+                                    let startTs = parseInt(ev.timestamp), sParts = ev.start_time.split(':'), eParts = ev.end_time.split(':');
+                                    let sMins = (parseInt(sParts[0]) * 60) + parseInt(sParts[1]), eMins = (parseInt(eParts[0]) * 60) + parseInt(eParts[1]);
                                     if (eMins < sMins) { eMins += 1440; } 
                                     let endTs = startTs + ((eMins - sMins) * 60);
 
-                                    let startD = new Date(startTs * 1000);
-                                    let endD = new Date(endTs * 1000);
+                                    let startD = new Date(startTs * 1000), endD = new Date(endTs * 1000);
                                     let formatTime = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
                                     let timeFmt = formatTime(startD) + ' - ' + formatTime(endD);
                                     
@@ -2404,15 +2364,13 @@ function lj_render_frontend_app($atts) {
                                     let isToday = startD.getDate() === today.getDate() && startD.getMonth() === today.getMonth() && startD.getFullYear() === today.getFullYear();
                                     let dayLabel = isToday ? 'Today' : startD.toLocaleDateString([], { weekday: 'long' });
 
-                                    sl.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">
-                                        <div>
-                                            <strong style="display:block; color:var(--lj-accent); font-size:14px;">${escapeHTML(ev.title)}</strong>
-                                            <span style="color:var(--lj-sec); font-size:12px;">${timeFmt}</span>
-                                        </div>
-                                        <div style="background:var(--lj-panel); padding:4px 10px; border-radius:8px; font-weight:700; font-size:11px; border:1px solid var(--lj-border);">
-                                            ${dayLabel}
-                                        </div>
-                                    </li>`;
+                                    sl.innerHTML += '<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">' +
+                                        '<div>' +
+                                            '<strong style="display:block; color:var(--lj-accent); font-size:14px;">' + escapeHTML(ev.title) + '</strong>' +
+                                            '<span style="color:var(--lj-sec); font-size:12px;">' + timeFmt + '</span>' +
+                                        '</div>' +
+                                        '<div style="background:var(--lj-panel); padding:4px 10px; border-radius:8px; font-weight:700; font-size:11px; border:1px solid var(--lj-border);">' + dayLabel + '</div>' +
+                                    '</li>';
                                 });
                             }
                         }
@@ -2437,7 +2395,7 @@ function lj_render_frontend_app($atts) {
                         document.getElementById('lj-np-status-label').innerText = 'On Air';
                         document.getElementById('lj-np-status-label').style.color = '';
                     }
-                    countDisp.innerHTML = `<i class="fa-solid fa-users"></i> ${d.data.listener_count}`;
+                    countDisp.innerHTML = svgs.users + ' ' + d.data.listener_count;
                     
                     if (d.data.catalog_version && d.data.catalog_version > clientCatalogVersion) {
                         if (clientCatalogVersion !== 0) { loadCat(); if ('caches' in window) caches.delete(LJ_CACHE_NAME); }
@@ -2456,11 +2414,11 @@ function lj_render_frontend_app($atts) {
                     let uiId = root.dataset.currentSongId;
                     if(uiId !== String(np.id) && !isPreviewing) {
                         root.dataset.currentSongId = np.id;
-                        let eBadge = np.is_explicit ? `<span class="lj-explicit-badge">E</span>` : '';
+                        let eBadge = np.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
                         let sLink = escapeHTML(np.permalink);
-                        let lyricsLink = `<a href="${sLink}" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details"><i class="fa-solid fa-file-lines"></i></a>`;
+                        let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
                         document.getElementById('lj-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
-                        document.getElementById('lj-np-artist').innerHTML = `<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${escapeHTML(np.artist)}</span>`;
+                        document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(np.artist) + '</span>';
                         
                         let tipContainer = document.getElementById('lj-np-tip-container');
                         let tipBtn = document.getElementById('lj-np-tip-btn');
@@ -2469,60 +2427,40 @@ function lj_render_frontend_app($atts) {
                             tipContainer.style.display = 'block';
                             tipBtn.style.transform = 'scale(1.03)';
                             setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
-                        } else {
-                            tipContainer.style.display = 'none';
-                        }
+                        } else { tipContainer.style.display = 'none'; }
 
                         let bannerEl = document.getElementById('lj-np-banner');
                         let bannerTextEl = document.getElementById('lj-np-banner-text');
                         if (np.banner) {
-                            bannerEl.style.display = 'block';
-                            bannerTextEl.innerHTML = np.banner; 
+                            bannerEl.style.display = 'block'; bannerTextEl.innerHTML = np.banner; 
                         } else {
                             bannerEl.style.display = 'none';
                             bannerTextEl.innerHTML = '';
                         }
 
-                        if ('mediaSession' in navigator) {
-                            navigator.mediaSession.metadata = new MediaMetadata({ title: np.title, artist: np.artist, album: 'Community Radio Jukebox' });
-                        }
-                        
+                        if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: np.title, artist: np.artist, album: 'Community Radio Jukebox' });
                         recordSongPlay(np.title, false); 
-                        
                         startClock(np.duration, np.start_timestamp, np.server_now);
                         loadCat(); 
                     }
 
                     if(isSync && prev.paused) {
                         let offset = np.server_now - np.start_timestamp;
-                        let iDur = parseFloat(np.intro_duration) || 0;
-                        let sDur = parseFloat(np.song_duration) || 0;
-                        let oDur = parseFloat(np.outro_duration) || 0;
-
-                        let activeUrl = np.url;
-                        let activeOffset = offset;
-                        let targetPhase = 'song';
+                        let iDur = parseFloat(np.intro_duration) || 0, sDur = parseFloat(np.song_duration) || 0, oDur = parseFloat(np.outro_duration) || 0;
+                        let activeUrl = np.url, activeOffset = offset, targetPhase = 'song';
 
                         if (iDur > 0 && offset < iDur) {
-                            activeUrl = np.intro_url;
-                            activeOffset = offset;
-                            targetPhase = 'intro';
+                            activeUrl = np.intro_url; activeOffset = offset; targetPhase = 'intro';
                         } else if (offset < iDur + sDur) {
-                            activeUrl = np.url;
-                            activeOffset = offset - iDur;
-                            targetPhase = 'song';
+                            activeUrl = np.url; activeOffset = offset - iDur; targetPhase = 'song';
                         } else if (oDur > 0 && offset < iDur + sDur + oDur) {
-                            activeUrl = np.outro_url;
-                            activeOffset = offset - iDur - sDur;
-                            targetPhase = 'outro';
+                            activeUrl = np.outro_url; activeOffset = offset - iDur - sDur; targetPhase = 'outro';
                         }
 
                         let phaseId = np.id + '_' + targetPhase;
 
                         if(window.currentPhaseId !== phaseId) {
-                            window.currentPhaseId = phaseId;
-                            cId = np.id; 
-                            
+                            window.currentPhaseId = phaseId; cId = np.id; 
                             live.src = activeUrl;
                             live.onloadedmetadata = () => { 
                                 if (!isSync) return; 
@@ -2532,10 +2470,7 @@ function lj_render_frontend_app($atts) {
                                         if(syncBtn) syncBtn.style.display = 'none'; 
                                         if(discBtn) discBtn.style.display = 'block'; 
                                     }).catch(e => {
-                                        if(syncBtn) {
-                                            syncBtn.style.display = 'block'; 
-                                            syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                                        }
+                                        if(syncBtn) { syncBtn.style.display = 'block'; syncBtn.innerHTML = svgs.playLg + ' Resume Sync'; }
                                         if(discBtn) discBtn.style.display = 'none';
                                     });
                                 }
@@ -2564,11 +2499,8 @@ function lj_render_frontend_app($atts) {
                     if (isSync && !isOffline) {
                         isOffline = true; 
                         
-                        if (!cId) {
-                            showNotification("Offline Mode active. Starting Local Radio.", "warning");
-                        } else {
-                            showNotification("Connection lost. Switching to Local Buffer.", "warning");
-                        }
+                        if (!cId) { showNotification("Offline Mode active. Starting Local Radio.", "warning"); } 
+                        else { showNotification("Connection lost. Switching to Local Buffer.", "warning"); }
 
                         document.getElementById('lj-np-status-label').innerText = 'Offline Mode';
                         document.getElementById('lj-np-status-label').style.color = '#dc3545';
@@ -2584,21 +2516,14 @@ function lj_render_frontend_app($atts) {
                                     live.currentTime = currentPlayTime || 0; 
                                     if (!wasPaused && !isPreviewing) {
                                         live.play().catch(e => {
-                                            if(syncBtn) {
-                                                syncBtn.style.display = 'block';
-                                                syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                                            }
+                                            if(syncBtn) { syncBtn.style.display = 'block'; syncBtn.innerHTML = svgs.playLg + ' Resume Sync'; }
                                             if(discBtn) discBtn.style.display = 'none';
                                         });
                                     } 
                                 };
                                 live.load();
-                            } else {
-                                live.onended();
-                            }
-                        } else {
-                            live.onended();
-                        }
+                            } else { live.onended(); }
+                        } else { live.onended(); }
                     }
                 });
             }
@@ -2701,19 +2626,16 @@ function lj_render_frontend_app($atts) {
                             }
                             
                             if (nextUnlockTs !== Infinity) {
-                                emptyMsg = `<li style="padding:30px 15px; text-align:center; color:var(--lj-sec); background:var(--lj-panel); border:1px dashed var(--lj-border); border-radius:12px; grid-column: 1 / -1;">
-                                    <i class="fa-regular fa-clock" style="font-size:28px; margin-bottom:12px; color:var(--lj-accent);"></i><br>
-                                    <strong style="font-size:15px; color:var(--lj-text);">No tracks currently available</strong><br>
-                                    <span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--lj-accent); padding:4px 12px; border-radius:12px;">${nextUnlockMsg}</span>
-                                </li>`;
+                                emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--lj-sec); background:var(--lj-panel); border:1px dashed var(--lj-border); border-radius:12px; grid-column: 1 / -1;">' +
+                                    '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--lj-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
+                                    '<strong style="font-size:15px; color:var(--lj-text);">No tracks currently available</strong><br>' +
+                                    '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--lj-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
+                                '</li>';
                             } else {
                                 emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
                             }
-                        } else if (currentArtistFilter) {
-                            emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
-                        } else if (currentGenreFilter) {
-                            emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>';
-                        }
+                        } else if (currentArtistFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
+                        } else if (currentGenreFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>'; }
                     }
                     
                     l.innerHTML = emptyMsg; 
@@ -2724,39 +2646,27 @@ function lj_render_frontend_app($atts) {
                 let votedIds = getVotedSongs();
 
                 sorted.forEach(s => {
-                    let sTitle = escapeHTML(s.title);
-                    let sArtist = escapeHTML(s.artist);
-                    let sLink = escapeHTML(s.permalink);
-
+                    let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
                     let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
-                    let eBadge = s.is_explicit ? `<span class="lj-explicit-badge" title="Explicit Content">E</span>` : '';
+                    let eBadge = s.is_explicit ? '<span class="lj-explicit-badge" title="Explicit Content">E</span>' : '';
                     
-                    if (s.is_locked_by_schedule) {
-                        badge = `<div class="lj-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;"><i class="fa-solid fa-lock"></i> ${escapeHTML(s.unlock_msg)}</div>`;
-                    } else if (s.is_playing) {
-                        badge = `<div class="lj-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>`;
-                    } else if (s.cooldown > 0) {
-                        badge = `<div class="lj-cooldown-badge"><i class="fa-regular fa-clock"></i> Avail ${new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</div>`;
-                    }
+                    if (s.is_locked_by_schedule) { badge = '<div class="lj-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
+                    else if (s.is_playing) { badge = '<div class="lj-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>'; } 
+                    else if (s.cooldown > 0) { badge = '<div class="lj-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
                     
-                    let cIcon = (s.url && cachedUrls.has(s.url)) ? `<i class="fa-solid fa-circle-check" style="color:#28a745; font-size:12px; margin-left:5px;" title="Buffered for Offline"></i>` : '';
+                    let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
+                    let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
                     
-                    let lyricsBtn = `<a href="${sLink}" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;"><i class="fa-solid fa-file-lines"></i></a>`;
-                    
-                    let safeVoteTitle = sTitle.replace(/'/g, "\\'");
-                    let safeArtistQuote = sArtist.replace(/'/g, "\\'");
-                    let safePreviewUrl = escapeHTML(s.preview_url);
+                    let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
 
                     let genresArray = s.genre ? s.genre.split(', ') : [];
-                    let gBadge = genresArray.length > 0 
-                        ? `<div style="margin-top: 6px;">` + genresArray.map(g => `<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre('${escapeHTML(g).replace(/'/g, "\\'")}')">${escapeHTML(g)}</span>`).join('') + `</div>`
-                        : '';
+                    let gBadge = genresArray.length > 0 ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>' : '';
 
                     let voteBtnHtml = votedIds.includes(s.id)
-                        ? `<button class="lj-btn lj-btn-vote lj-voted" disabled><i class="fa-solid fa-check"></i></button>`
-                        : `<button class="lj-btn lj-btn-vote" onclick="voteSong(${s.id}, '${safeVoteTitle}')"><i class="fa-solid fa-plus"></i></button>`;
+                        ? '<button class="lj-btn lj-btn-vote lj-voted" disabled>' + svgs.check + '</button>'
+                        : '<button class="lj-btn lj-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
 
-                    l.innerHTML += `<li class="lj-track-item ${isLocked ? 'lj-locked' : ''}"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="${sLink}" style="color:inherit; text-decoration:none;" target="_blank">${sTitle}</a> ${eBadge} ${cIcon}</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">${sArtist}</span></div>${badge}${gBadge}</div><div style="display:flex; gap:8px; align-items: center;">${lyricsBtn}<button class="lj-btn" onclick="previewSong('${safePreviewUrl}', '${safeVoteTitle}', '${safeArtistQuote}')"><i class="fa-solid fa-play"></i></button>${voteBtnHtml}</div></li>`;
+                    l.innerHTML += '<li class="lj-track-item ' + (isLocked ? 'lj-locked' : '') + '"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="lj-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
                 });
             }
             
@@ -2771,20 +2681,13 @@ function lj_render_frontend_app($atts) {
                     if (syncBtn) syncBtn.style.display = 'none';
                     if (discBtn) discBtn.style.display = 'block';
                     live.play().catch(e => {
-                        if (syncBtn) {
-                            syncBtn.style.display = 'block'; 
-                            syncBtn.innerHTML = '<i class="fa-solid fa-play"></i> Resume Sync';
-                        }
+                        if (syncBtn) { syncBtn.style.display = 'block'; syncBtn.innerHTML = svgs.playLg + ' Resume Sync'; }
                         if (discBtn) discBtn.style.display = 'none';
                     });
                 } else {
-                    if (syncBtn) {
-                        syncBtn.style.display = 'block';
-                        syncBtn.innerHTML = '<i class="fa-solid fa-broadcast-tower"></i> Connect';
-                    }
+                    if (syncBtn) { syncBtn.style.display = 'block'; syncBtn.innerHTML = svgs.broadcast + ' Connect'; }
                     if (discBtn) discBtn.style.display = 'none';
                 }
-                
                 poll(); 
             }
 
@@ -2796,7 +2699,6 @@ function lj_render_frontend_app($atts) {
                 isPreviewing = true; currentPreviewUrl = u;
                 document.getElementById('lj-np-status-label').innerText = 'Local Broadcast'; document.getElementById('lj-np-status-label').style.color = '#28a745';
                 document.getElementById('lj-np-title').innerText = title; document.getElementById('lj-np-artist').innerHTML = artist;
-                
                 document.getElementById('lj-np-tip-container').style.display = 'none'; 
                 
                 var existingBanner = document.getElementById('lj-np-banner');
@@ -2811,34 +2713,26 @@ function lj_render_frontend_app($atts) {
                     const success = await getAndSetCachedAudio(u, prev, true);
                     if (!success) {
                         showNotification('Preview audio not buffered for offline use.', 'warning');
-                        stopPreview();
-                        return;
+                        stopPreview(); return;
                     }
-                } else {
-                    prev.src = u;
-                }
+                } else { prev.src = u; }
 
                 recordSongPlay(title, true); 
 
                 prev.play().catch(e=>{}); 
                 prev.ontimeupdate = () => { 
-                    if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('lj-np-time').innerHTML = `<i class="fa-solid fa-stopwatch" style="color:#28a745;"></i> 0:${(rem<0?0:rem).toString().padStart(2,'0')}`; }
+                    if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('lj-np-time').innerHTML = svgs.stopwatch + ' 0:' + (rem<0?0:rem).toString().padStart(2,'0'); }
                     if(prev.currentTime >= 30) stopPreview();
                 }; 
             };
             
             window.voteSong = (id, title) => { 
                 const f = new FormData(); 
-                f.append('action', 'lj_vote'); 
-                f.append('song_id', id); 
-                f.append('security', securityNonce); 
-                f.append('station', stationId);
-                
+                f.append('action', 'lj_vote'); f.append('song_id', id); f.append('security', securityNonce); f.append('station', stationId);
                 fetch(ajaxUrl, { method: 'POST', body: f }).then(r => r.json()).then(d => { 
                     if(!d.success) showNotification(d.data, 'danger'); 
                     else { 
-                        addVotedSong(id);
-                        trackJukeboxEvent('Vote Track', title); 
+                        addVotedSong(id); trackJukeboxEvent('Vote Track', title); 
                         showNotification('Vote added!', 'success'); 
                         poll(); loadCat(); 
                     }
