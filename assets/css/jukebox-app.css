@@ -1,0 +1,62 @@
+:root { --lj-bg: #fff; --lj-text: #222; --lj-panel: rgba(245,245,245,0.92); --lj-border: #ccc; --lj-accent: #0073aa; --lj-sec: #555; }
+[data-theme="dark"] { --lj-bg: #000; --lj-text: #fff; --lj-panel: rgba(10,10,10,0.85); --lj-border: #444; --lj-accent: #3598dc; --lj-sec: #bbb; }
+
+.lj-app-container { position: relative; z-index: 10; background: var(--lj-panel); color: var(--lj-text); font-family: system-ui, sans-serif; width: 94%; max-width: 480px; margin: 20px auto; padding: 20px; border: 1px solid var(--lj-border); border-radius: 24px; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); backdrop-filter: blur(15px); box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+
+.lj-dashboard-grid { display: flex; flex-direction: column; gap: 20px; }
+.lj-dashboard-column { display: flex; flex-direction: column; gap: 15px; }
+
+.lj-track-item { background: var(--lj-panel); border: 1px solid var(--lj-border); padding: 15px; border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; transition: opacity 0.3s; width: 100%; max-width: none; contain: layout; position: relative; box-sizing: border-box; }
+.lj-track-info { flex: 1; min-width: 160px; max-width: none; overflow: hidden; }
+
+.lj-locked .lj-track-info, .lj-locked .lj-btn-vote { opacity: 0.5; filter: grayscale(0.8); }
+.lj-locked .lj-btn-vote { pointer-events: none; cursor: not-allowed; }
+.lj-cooldown-badge { font-size: 10px; font-weight: 800; background: rgba(220, 53, 69, 0.15); color: #dc3545; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 6px; }
+.lj-explicit-badge { font-size: 9px; font-weight: 800; background: #666; color: #fff; padding: 2px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+.lj-genre-badge { font-size: 10px; font-weight: 700; background: var(--lj-accent); color: #fff; padding: 2px 6px; border-radius: 6px; margin-left: 6px; text-transform: uppercase; }
+.lj-clickable-artist { cursor: pointer; color: var(--lj-accent); transition: opacity 0.2s; text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 3px; }
+.lj-btn { background: var(--lj-accent); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: transform 0.1s; display: inline-flex; align-items: center; justify-content: center; }
+.lj-btn-vote { background: #28a745; transition: all 0.2s ease; }
+.lj-btn-vote.lj-voted { background: #155d27; opacity: 0.7; cursor: default; }
+.lj-btn-sync { background: #d63638; width: 100%; padding: 18px; border-radius: 50px; animation: pulse 2s infinite; margin-top: 15px; font-size: 17px;}
+.lj-btn-disconnect { background: var(--lj-sec); width: 100%; padding: 18px; border-radius: 50px; display: none; margin-top: 15px;}
+.lj-station-badge { font-size: 11px; font-weight: 800; background: var(--lj-accent); color: #fff; padding: 4px 10px; border-radius: 12px; margin-top: 5px; display: inline-block; vertical-align: middle; white-space: nowrap; }
+
+.lj-marquee-container { width: 100%; max-width: 100%; overflow: hidden; white-space: nowrap; background: rgba(0,0,0,0.05); border-radius: 6px; margin-top: 10px; padding: 5px 0; box-sizing: border-box; contain: layout paint; position: relative; display: block; }
+[data-theme="dark"] .lj-marquee-container { background: rgba(255,255,255,0.05); }
+.lj-marquee-content { display: inline-block; padding-left: 100%; animation: lj-marquee 12s linear infinite; font-weight: 600; font-size: 12px; color: var(--lj-accent); }
+
+#lj-schedule-list { max-height: 250px; overflow-y: auto; padding-right: 5px; scrollbar-width: thin; scrollbar-color: var(--lj-border) transparent; }
+#lj-schedule-list::-webkit-scrollbar { width: 4px; }
+#lj-schedule-list::-webkit-scrollbar-track { background: transparent; }
+#lj-schedule-list::-webkit-scrollbar-thumb { background: var(--lj-border); border-radius: 4px; }
+
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0.6); } 70% { box-shadow: 0 0 0 15px rgba(214, 54, 56, 0); } 100% { box-shadow: 0 0 0 0 rgba(214, 54, 56, 0); } }
+@keyframes lj-marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+@keyframes lj-spin { 100% { transform: rotate(360deg); } }
+.lj-spin { animation: lj-spin 1s linear infinite; }
+
+#lj-alert-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; width: 90%; max-width: 460px; pointer-events: none; }
+#lj-alert-container .alert { pointer-events: auto; font-weight: 600; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); border: none; }
+
+@media (min-width: 768px) {
+    .lj-app-container { max-width: 1140px; width: 92%; padding: 30px; margin: 40px auto; }
+    .lj-dashboard-grid { display: grid; grid-template-columns: 340px 1fr; gap: 25px; align-items: start; }
+    
+    .lj-sticky-pane { 
+        position: sticky; 
+        top: 100px; 
+        max-height: calc(100vh - 120px); 
+        overflow-y: auto; 
+        scrollbar-width: none;
+    }
+    .lj-sticky-pane::-webkit-scrollbar { display: none; }
+    
+    #lj-queue-list, #lj-catalog-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
+    .lj-track-item { margin-bottom: 0; }
+}
+
+@media (min-width: 1200px) {
+    .lj-dashboard-grid { grid-template-columns: 380px 1fr; gap: 35px; }
+    #lj-queue-list, #lj-catalog-list { grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 18px; }
+}
