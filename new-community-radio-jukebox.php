@@ -341,7 +341,7 @@ function crjb_gemini_bulk_scan_handler() {
 }
 
 function crjb_execute_gemini_scan($song_id) {
-    if (!function_exists('wp_ai_client_prompt')) {
+    if (!function_exists('wp_ai_client_prompt') || !class_exists('\WordPress\AiClient\AiClient')) {
         return new WP_Error('ai_client_missing', 'WordPress 7.0 AI Client is required for this feature. Please ensure the Google AI provider is installed under Settings > Connectors.');
     }
 
@@ -371,22 +371,34 @@ function crjb_execute_gemini_scan($song_id) {
 
     $mime = mime_content_type($file_path) ?: 'audio/mp3';
 
-    $prompt = "You are an expert music curator and strict audio transcriptionist. Listen to the provided audio track.\n\nSTRICT RULES:\n1. For 'genres', provide an array of 2 to 4 accurate standard musical genres/sub-genres based on the sonic profile.\n2. For 'lyrics', you MUST ONLY transcribe the exact words you hear in the audio file. DO NOT hallucinate, guess, or search for lyrics based on the title or artist. If there are no vocals, or if you cannot clearly hear them, output exactly: 'Instrumental'.\n3. For 'is_explicit', analyze the audio and lyrics for strong profanity, explicit sexual themes, or highly sensitive/graphic violent content. Return a boolean true if explicit content is present, or false if the track is completely clean.\n\nReturn a JSON object with exactly three keys: 'genres', 'lyrics', and 'is_explicit'.";
+    $prompt = "You are an expert music curator and strict audio transcriptionist. Listen to the provided audio track.\n\nSTRICT RULES:\n1. For 'genres', provide an array of 2 to 4 accurate standard musical genres/sub-genres based on the sonic profile.\n2. For 'lyrics', you MUST ONLY transcribe the exact words you hear in the audio file. DO NOT hallucinate, guess, or search for lyrics based on the title or artist. If there are no vocals, or if you cannot clearly hear them, output exactly: 'Instrumental'.\n3. For 'is_explicit', analyze the audio and lyrics for strong profanity, explicit sexual themes, or highly sensitive/graphic violent content. Return a boolean true if explicit content is present, or false if the track is completely clean.";
 
-    $result = wp_ai_client_prompt($prompt)
-        ->using_system_instruction('You are a precise JSON generator. Output valid JSON only, with no markdown formatting or backticks.')
-        ->with_file($file_path, $mime)
-        ->using_model_preference('gemini-2.5-pro')
-        ->as_json_response()
-        ->generate_text();
+    try {
+        // Explicitly bypass preference capability matching and enforce the Gemini model object
+        $registry = \WordPress\AiClient\AiClient::defaultRegistry();
+        $model = $registry->getProviderModel('google', 'gemini-2.5-pro');
+        
+        if (!$model) {
+             return new WP_Error('model_missing', 'The Gemini 2.5 Pro model could not be found. Ensure the Google AI connector is configured.');
+        }
+
+        $result = wp_ai_client_prompt($prompt)
+            ->using_system_instruction('You are a precise JSON generator. Output valid JSON only, with no markdown formatting or backticks.')
+            ->with_file($file_path, $mime)
+            ->using_model($model)
+            ->as_json_response()
+            ->generate_text();
+            
+    } catch (Exception $e) {
+        return new WP_Error('ai_error', $e->getMessage());
+    }
 
     if (is_wp_error($result)) return $result;
 
     $data = json_decode($result, true);
     
     if (!$data) {
-        $clean_result = trim(str_replace(['```json', '
-```'], '', $result));
+        $clean_result = trim(str_replace(['```json', '```'], '', $result));
         $data = json_decode($clean_result, true);
         if (!$data) return new WP_Error('parse_error', 'Failed to parse Gemini response.');
     }
@@ -629,7 +641,7 @@ function crjb_song_dedicated_page_content($content) {
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Duration</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . $duration_fmt . '</span></div>';
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Genres</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . esc_html($genres) . '</span></div>';
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Playlists</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . esc_html($playlists) . '</span></div>';
-        $html .= '<div><strong style="font-size: 15px; font-weight: 700; color: #0073aa;">Featured In</strong><span style="font-size: 15px; font-weight: 700; color: #0073aa;">' . esc_html($events_str) . '</span></div>';
+        $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Featured In</strong><span style="font-size: 15px; font-weight: 700; color: #0073aa;">' . esc_html($events_str) . '</span></div>';
         $html .= '</div>';
 
         if ($is_royalty_free && $full_audio_url) {
@@ -909,7 +921,7 @@ function crjb_schedule_details_callback( $post ) {
             <td>
                 <?php foreach($all_days as $val => $label): ?>
                     <label style="margin-right: 15px;">
-                        <input type="checkbox" name="crjb_days[]" value="' . esc_attr($val) . '" <?php checked(in_array($val, $days)); ?> /> <?php echo esc_html($label); ?>
+                        <input type="checkbox" name="crjb_days[]" value="<?php echo esc_attr($val); ?>" <?php checked(in_array($val, $days)); ?> /> <?php echo esc_html($label); ?>
                     </label>
                 <?php endforeach; ?>
             </td>
@@ -1526,97 +1538,6 @@ function crjb_get_state() {
 
     $cp = crjb_process_queue_and_get_current($station_id);
     $q = get_transient("crjb_active_queue_{$station_id}") ?: [];
-add_action( 'wp_ajax_crjb_get_state', 'crjb_get_state' );
-add_action( 'wp_ajax_nopriv_crjb_get_state', 'crjb_get_state' );
-function crjb_get_state() {
-    if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
-    
-    $now = time(); 
-    
-    // phpcs:disable WordPress.Security.NonceVerification.Recommended -- Public read-only state endpoint, relies on edge caching.
-    $lid = isset($_GET['listener_id']) ? sanitize_text_field(wp_unslash($_GET['listener_id'])) : '';
-    $is_listening = isset($_GET['is_listening']) ? sanitize_text_field(wp_unslash($_GET['is_listening'])) : 'false';
-    
-    $station_id = isset($_GET['station']) ? sanitize_text_field(wp_unslash($_GET['station'])) : 'global';
-    // phpcs:enable
-    
-    $station_id = crjb_validate_station_id($station_id);
-
-    $listeners = get_option("crjb_active_listeners_{$station_id}", []);
-    if ($lid) { if($is_listening === 'true') $listeners[$lid] = $now; else unset($listeners[$lid]); }
-    foreach($listeners as $k => $v) if($now - $v > 15) unset($listeners[$k]);
-    update_option("crjb_active_listeners_{$station_id}", $listeners, 'no');
-
-    $cp = crjb_process_queue_and_get_current($station_id);
-    $q = get_transient("crjb_active_queue_{$station_id}") ?: [];
-    
-    // Corrected sorting logic (removed the hallucinated glitch line)
-    uasort($q, function($a, $b){ return $a['votes'] == $b['votes'] ? $a['added'] <=> $b['added'] : $b['votes'] <=> $a['votes']; });
-    
-    $fq = [];
-    foreach($q as $sid => $d) {
-        $custom_banner = get_post_meta($sid, 'crjb_custom_banner_text', true);
-        $submitter_terms = wp_get_post_terms($sid, 'crjb_submitter', ['fields' => 'names']);
-        $submitter = !empty($submitter_terms) ? implode(', ', $submitter_terms) : '';
-        $banner = !empty($custom_banner) ? $custom_banner : (!empty($submitter) ? 'Submitted by: ' . $submitter : '');
-
-        $fq[] = ['id' => $sid, 'title' => html_entity_decode(get_the_title($sid)), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'crjb_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($sid, 'crjb_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($sid, 'crjb_lyrics', true)), 'banner' => $banner, 'tip_url' => get_post_meta($sid, 'crjb_tip_url', true), 'genre' => implode(', ', wp_get_post_terms($sid, 'crjb_genre', ['fields' => 'names']) ?: []), 'votes' => $d['votes'], 'preview_url' => get_post_meta($sid, 'preview_url', true), 'url' => get_post_meta($sid, 'full_audio_url', true), 'permalink' => get_permalink($sid) ];
-    }
-    
-    $np = null;
-    if ($cp) {
-        $custom_banner_np = get_post_meta($cp['id'], 'crjb_custom_banner_text', true);
-        $submitter_terms_np = wp_get_post_terms($cp['id'], 'crjb_submitter', ['fields' => 'names']);
-        $submitter_np = !empty($submitter_terms_np) ? implode(', ', $submitter_terms_np) : '';
-        $banner_np = !empty($custom_banner_np) ? $custom_banner_np : (!empty($submitter_np) ? 'Submitted by: ' . $submitter_np : '');
-
-        $np = [
-            'id' => $cp['id'], 
-            'title' => html_entity_decode(get_the_title($cp['id'])), 
-            'artist' => html_entity_decode(implode(', ', wp_get_post_terms($cp['id'], 'crjb_artist', ['fields' => 'names']) ?: ['Unknown'])), 
-            'is_explicit' => get_post_meta($cp['id'], 'crjb_is_explicit', true) ? true : false, 
-            'has_lyrics' => !empty(get_post_meta($cp['id'], 'crjb_lyrics', true)), 
-            'banner' => $banner_np, 
-            'tip_url' => get_post_meta($cp['id'], 'crjb_tip_url', true), 
-            'url' => $cp['url'], 
-            'intro_url' => get_post_meta($cp['id'], 'intro_audio_url', true),
-            'outro_url' => get_post_meta($cp['id'], 'outro_audio_url', true),
-            'intro_duration' => get_post_meta($cp['id'], 'intro_duration', true) ?: 0,
-            'song_duration' => get_post_meta($cp['id'], 'audio_duration', true) ?: 180,
-            'outro_duration' => get_post_meta($cp['id'], 'outro_duration', true) ?: 0,
-            'permalink' => get_permalink($cp['id']), 
-            'start_timestamp' => $cp['start_time'], 
-            'duration' => $cp['duration'], 
-            'server_now' => $now 
-        ];
-    }
-    $cat_version = get_option('crjb_catalog_version', 0);
-    
-    $all_schedules = get_posts(['post_type' => 'crjb_schedule', 'posts_per_page' => -1]);
-    $upcoming_events = [];
-    foreach($all_schedules as $sched) {
-        $next_run = crjb_get_next_schedule_timestamp($sched->ID);
-        if ($next_run) {
-            $upcoming_events[] = [
-                'title' => get_the_title($sched->ID),
-                'timestamp' => $next_run,
-                'start_time' => get_post_meta($sched->ID, 'crjb_start_time', true),
-                'end_time' => get_post_meta($sched->ID, 'crjb_end_time', true)
-            ];
-        }
-    }
-    usort($upcoming_events, function($a, $b) { return $a['timestamp'] <=> $b['timestamp']; });
-    $sliced_events = array_slice($upcoming_events, 0, 20);
-    
-    wp_send_json_success([
-        'now_playing' => $np, 
-        'queue' => $fq, 
-        'listener_count' => count($listeners), 
-        'catalog_version' => $cat_version, 
-        'station_label' => crjb_get_station_label($station_id),
-        'upcoming_events' => $sliced_events
-    ]);
-}
     uasort($q, function($a, $b){ return $a['votes'] == $b['votes'] ? $a['added'] <=> $b['added'] : $b['votes'] <=> $a['votes']; });
     $fq = [];
     foreach($q as $sid => $d) {
