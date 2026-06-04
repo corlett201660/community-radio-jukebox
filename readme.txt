@@ -4,16 +4,13 @@ Tags: audio, radio, player, music, gemini
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 4.60.0
+Stable tag: 4.60.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 An interactive, synchronized community radio engine featuring Gemini AI curation, smart room routing, and bulletproof offline playback.
 
 == Description ==
-
-NOTE: REQUIRES the Font Awesome Plugin 
-https://wordpress.org/plugins/font-awesome/
 
 RECOMENDED: Bootstrap Theme
 https://them.es/starter-bootstrap/
