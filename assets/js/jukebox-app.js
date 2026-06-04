@@ -1,31 +1,31 @@
 document.addEventListener("DOMContentLoaded", function() {
-    const root = document.getElementById('lj-app-root'), themeBtn = document.getElementById('lj-theme-toggle');
-    const infoToggleBtn = document.getElementById('lj-info-toggle'), infoPanel = document.getElementById('lj-info-panel');
-    const scheduleToggleBtn = document.getElementById('lj-schedule-toggle'), schedulePanel = document.getElementById('lj-schedule-panel');
-    const catalogToggleBtn = document.getElementById('lj-catalog-toggle'), catalogContainer = document.getElementById('lj-catalog-container');
-    const alertContainer = document.getElementById('lj-alert-container');
+    const root = document.getElementById('crjb-app-root'), themeBtn = document.getElementById('crjb-theme-toggle');
+    const infoToggleBtn = document.getElementById('crjb-info-toggle'), infoPanel = document.getElementById('crjb-info-panel');
+    const scheduleToggleBtn = document.getElementById('crjb-schedule-toggle'), schedulePanel = document.getElementById('crjb-schedule-panel');
+    const catalogToggleBtn = document.getElementById('crjb-catalog-toggle'), catalogContainer = document.getElementById('crjb-catalog-container');
+    const alertContainer = document.getElementById('crjb-alert-container');
     
     // Pulling localized variables safely from WordPress
-    const ajaxUrl = ljJukeboxData.ajaxUrl;
-    const securityNonce = ljJukeboxData.securityNonce;
-    const stationId = ljJukeboxData.stationId;
+    const ajaxUrl = crjbJukeboxData.ajaxUrl;
+    const securityNonce = crjbJukeboxData.securityNonce;
+    const stationId = crjbJukeboxData.stationId;
 
-    const live = document.getElementById('lj-live-player'), prev = document.getElementById('lj-preview-player');
-    const syncBtn = document.getElementById('lj-sync-btn'), discBtn = document.getElementById('lj-disconnect-btn'), countDisp = document.getElementById('lj-listener-count');
-    const stopPreviewBtn = document.getElementById('lj-stop-preview-btn');
+    const live = document.getElementById('crjb-live-player'), prev = document.getElementById('crjb-preview-player');
+    const syncBtn = document.getElementById('crjb-sync-btn'), discBtn = document.getElementById('crjb-disconnect-btn'), countDisp = document.getElementById('crjb-listener-count');
+    const stopPreviewBtn = document.getElementById('crjb-stop-preview-btn');
 
-    const LJ_CACHE_NAME = 'lj-offline-buffer-' + stationId;
+    const CRJB_CACHE_NAME = 'crjb-offline-buffer-' + stationId;
     let cId = null, isSync = false, isOffline = false, catData = [], timer, offlineQueue = [];
-    let lId = localStorage.getItem('lj_l_id') || 'lj_'+Math.random().toString(36).substr(2,9);
+    let lId = localStorage.getItem('crjb_l_id') || 'crjb_'+Math.random().toString(36).substr(2,9);
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
-    localStorage.setItem('lj_l_id', lId);
+    localStorage.setItem('crjb_l_id', lId);
 
-    const availableOnlyCheckbox = document.getElementById('lj-available-only');
-    const savedAvailableOnly = localStorage.getItem('lj_available_only') === 'true';
+    const availableOnlyCheckbox = document.getElementById('crjb-available-only');
+    const savedAvailableOnly = localStorage.getItem('crjb_available_only') === 'true';
     availableOnlyCheckbox.checked = savedAvailableOnly;
 
     availableOnlyCheckbox.addEventListener('change', (e) => {
-        localStorage.setItem('lj_available_only', e.target.checked);
+        localStorage.setItem('crjb_available_only', e.target.checked);
         renderCat();
     });
 
@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
         alertTriangle: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
         alertCircle: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>',
         successCheck: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px; vertical-align:-0.125em;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
-        spinner: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lj-spin" style="margin-right:8px;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>',
+        spinner: '<svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="crjb-spin" style="margin-right:8px;"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>',
         plus: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>'
     };
     
@@ -68,35 +68,35 @@ document.addEventListener("DOMContentLoaded", function() {
     function recordSongPlay(title, isPreview = false) {
         if (isPreview) { trackJukeboxEvent('Preview Track', title); } 
         else {
-            let currentCount = parseInt(sessionStorage.getItem('lj_session_songs') || 0) + 1;
-            sessionStorage.setItem('lj_session_songs', currentCount);
+            let currentCount = parseInt(sessionStorage.getItem('crjb_session_songs') || 0) + 1;
+            sessionStorage.setItem('crjb_session_songs', currentCount);
             trackJukeboxEvent('Play Track', title);
             trackJukeboxEvent('Session Total Plays', currentCount.toString(), currentCount);
         }
     }
 
     function getVotedSongs() {
-        let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
+        let votes = JSON.parse(localStorage.getItem('crjb_user_votes_' + stationId) || '{}');
         let now = Date.now();
         let validIds = [];
         for (let id in votes) {
             if (now - votes[id] < 3600000) validIds.push(parseInt(id));
             else delete votes[id];
         }
-        localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
+        localStorage.setItem('crjb_user_votes_' + stationId, JSON.stringify(votes));
         return validIds;
     }
 
     function addVotedSong(id) {
-        let votes = JSON.parse(localStorage.getItem('lj_user_votes_' + stationId) || '{}');
+        let votes = JSON.parse(localStorage.getItem('crjb_user_votes_' + stationId) || '{}');
         votes[id] = Date.now();
-        localStorage.setItem('lj_user_votes_' + stationId, JSON.stringify(votes));
+        localStorage.setItem('crjb_user_votes_' + stationId, JSON.stringify(votes));
     }
 
     let cachedUrls = new Set();
     async function refreshCacheSet() {
         if (!('caches' in window)) return;
-        const cache = await caches.open(LJ_CACHE_NAME);
+        const cache = await caches.open(CRJB_CACHE_NAME);
         const keys = await cache.keys();
         cachedUrls.clear();
         keys.forEach(req => cachedUrls.add(req.url));
@@ -119,13 +119,13 @@ document.addEventListener("DOMContentLoaded", function() {
         };
     }
 
-    const catalogVisible = localStorage.getItem('lj_catalog_visible') !== 'false';
+    const catalogVisible = localStorage.getItem('crjb_catalog_visible') !== 'false';
     catalogContainer.style.display = catalogVisible ? 'block' : 'none';
     catalogToggleBtn.style.opacity = catalogVisible ? '1' : '0.5';
     catalogToggleBtn.onclick = () => {
         const isHidden = catalogContainer.style.display === 'none';
         catalogContainer.style.display = isHidden ? 'block' : 'none';
-        localStorage.setItem('lj_catalog_visible', isHidden);
+        localStorage.setItem('crjb_catalog_visible', isHidden);
         catalogToggleBtn.style.opacity = isHidden ? '1' : '0.5';
     };
 
@@ -148,16 +148,16 @@ document.addEventListener("DOMContentLoaded", function() {
 
     function renderQueueUI(queueArray) {
         let votedIds = getVotedSongs();
-        const ql = document.getElementById('lj-queue-list'); 
+        const ql = document.getElementById('crjb-queue-list'); 
         ql.innerHTML = '';
         queueArray.forEach(s => {
             let sTitle = escapeHTML(s.title);
             let sArtist = escapeHTML(s.artist);
             let sLink = escapeHTML(s.permalink);
             
-            let eBadge = s.is_explicit ? '<span class="lj-explicit-badge" title="Explicit Content">E</span>' : '';
+            let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
             let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
-            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
+            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
             
             let safeVoteTitle = sTitle.replace(/'/g, "\\'");
             let safeArtistQuote = sArtist.replace(/'/g, "\\'");
@@ -165,20 +165,20 @@ document.addEventListener("DOMContentLoaded", function() {
             
             let genresArray = s.genre ? s.genre.split(', ') : [];
             let gBadge = genresArray.length > 0 
-                ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>'
+                ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="crjb-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>'
                 : '';
             
             let voteBtnHtml = votedIds.includes(s.id) 
-                ? '<button class="lj-btn lj-btn-vote lj-voted" disabled>' + svgs.check + ' ' + (s.votes || 0) + '</button>'
-                : '<button class="lj-btn lj-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.arrowUp + ' ' + (s.votes || 0) + '</button>';
+                ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + ' ' + (s.votes || 0) + '</button>'
+                : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.arrowUp + ' ' + (s.votes || 0) + '</button>';
 
-            ql.innerHTML += '<li class="lj-track-item"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="lj-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
+            ql.innerHTML += '<li class="crjb-track-item"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
         });
     }
 
     async function bufferNextTracks(tracks) {
         if (!('caches' in window)) return;
-        const cache = await caches.open(LJ_CACHE_NAME);
+        const cache = await caches.open(CRJB_CACHE_NAME);
         let updated = false;
         
         for (const song of tracks.slice(0, 5)) {
@@ -214,7 +214,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     async function getAndSetCachedAudio(url, audioElement, isPreview = false) {
         if (!('caches' in window)) return false;
-        const cache = await caches.open(LJ_CACHE_NAME);
+        const cache = await caches.open(CRJB_CACHE_NAME);
         const response = await cache.match(url);
         if (response) { 
             const blob = await response.blob(); 
@@ -232,11 +232,11 @@ document.addEventListener("DOMContentLoaded", function() {
         return false;
     }
 
-    const savedTheme = localStorage.getItem('lj_theme') || 'light';
+    const savedTheme = localStorage.getItem('crjb_theme') || 'light';
     root.dataset.theme = savedTheme; themeBtn.innerHTML = savedTheme === 'light' ? svgs.moon : svgs.sun;
     
     themeBtn.onclick = () => { 
-        let t = root.dataset.theme === 'light' ? 'dark' : 'light'; root.dataset.theme = t; localStorage.setItem('lj_theme', t);
+        let t = root.dataset.theme === 'light' ? 'dark' : 'light'; root.dataset.theme = t; localStorage.setItem('crjb_theme', t);
         themeBtn.innerHTML = t === 'light' ? svgs.moon : svgs.sun;
     };
 
@@ -290,21 +290,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (success) {
                     cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
                     
-                    let eBadge = nextSong.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
+                    let eBadge = nextSong.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                     let sLink = escapeHTML(nextSong.permalink);
                     let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
                     
-                    document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                    document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
+                    document.getElementById('crjb-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
+                    document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
                     
-                    let tipContainer = document.getElementById('lj-np-tip-container');
-                    let tipBtn = document.getElementById('lj-np-tip-btn');
+                    let tipContainer = document.getElementById('crjb-np-tip-container');
+                    let tipBtn = document.getElementById('crjb-np-tip-btn');
                     if (nextSong.tip_url && !isPreviewing) {
                         tipBtn.href = escapeHTML(nextSong.tip_url); tipContainer.style.display = 'block';
                         tipBtn.style.transform = 'scale(1.03)'; setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
                     } else { tipContainer.style.display = 'none'; }
 
-                    let bannerEl = document.getElementById('lj-np-banner'), bannerTextEl = document.getElementById('lj-np-banner-text');
+                    let bannerEl = document.getElementById('crjb-np-banner'), bannerTextEl = document.getElementById('crjb-np-banner-text');
                     if (nextSong.banner && !isPreviewing) {
                         bannerEl.style.display = 'block'; bannerTextEl.innerHTML = nextSong.banner; 
                     } else { bannerEl.style.display = 'none'; bannerTextEl.innerHTML = ''; }
@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         timer = setInterval(() => {
                             let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
                             let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-                            if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
+                            if (!isPreviewing) document.getElementById('crjb-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
                             if(rem === 0) clearInterval(timer);
                         }, 1000);
                     };
@@ -338,12 +338,12 @@ document.addEventListener("DOMContentLoaded", function() {
                          const s = await getAndSetCachedAudio(nextSong.url, live, false);
                          if (s) {
                              cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
-                             let eBadge = nextSong.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
+                             let eBadge = nextSong.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                              let sLink = escapeHTML(nextSong.permalink);
                              let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
                              
-                             document.getElementById('lj-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
-                             document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
+                             document.getElementById('crjb-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
+                             document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
                              
                              live.onloadedmetadata = () => { live.currentTime = 0; if(!isPreviewing) live.play().catch(e=>{}); };
                          }
@@ -358,18 +358,18 @@ document.addEventListener("DOMContentLoaded", function() {
         timer = setInterval(() => {
             let rem = dur - (Math.floor(Date.now()/1000) - localStart); if(rem < 0) rem = 0;
             let m = Math.floor(rem/60).toString().padStart(2,'0'), s = (rem%60).toString().padStart(2,'0');
-            if (!isPreviewing) document.getElementById('lj-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
+            if (!isPreviewing) document.getElementById('crjb-np-time').innerHTML = svgs.clock + ' ' + m + ':' + s;
             if(rem === 0 && !isOffline) { clearInterval(timer); poll(); }
         }, 1000);
     }
 
     function poll() {
-        fetch(ajaxUrl + '?action=lj_get_state&listener_id=' + lId + '&is_listening=' + isSync + '&security=' + securityNonce + '&station=' + stationId)
+        fetch(ajaxUrl + '?action=crjb_get_state&listener_id=' + lId + '&is_listening=' + isSync + '&security=' + securityNonce + '&station=' + stationId)
         .then(r => r.json()).then(d => {
             if(!d.success) return;
             
             if (d.data.upcoming_events) {
-                const sl = document.getElementById('lj-schedule-list');
+                const sl = document.getElementById('crjb-schedule-list');
                 if (sl) {
                     if (d.data.upcoming_events.length === 0) {
                         sl.innerHTML = '<li style="color:var(--lj-sec); font-style:italic;">No upcoming events scheduled. Enjoy Open Play!</li>';
@@ -402,28 +402,28 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             
             if (d.data.station_label) {
-                let badge = document.getElementById('lj-station-badge-text');
+                let badge = document.getElementById('crjb-station-badge-text');
                 if(badge) badge.innerText = escapeHTML(d.data.station_label);
             }
 
             if (d.data.now_playing === null && d.data.queue.length === 0) {
-                document.getElementById('lj-np-title').innerText = "Station Empty";
-                document.getElementById('lj-np-artist').innerHTML = "No tracks found for this criteria.";
-                document.getElementById('lj-np-tip-container').style.display = 'none';
-                document.getElementById('lj-np-banner').style.display = 'none';
+                document.getElementById('crjb-np-title').innerText = "Station Empty";
+                document.getElementById('crjb-np-artist').innerHTML = "No tracks found for this criteria.";
+                document.getElementById('crjb-np-tip-container').style.display = 'none';
+                document.getElementById('crjb-np-banner').style.display = 'none';
                 return;
             }
 
             if (isOffline && isSync) {
                 showNotification("Connection restored. Re-syncing.", "success");
                 isOffline = false; cId = null; window.currentPhaseId = null;
-                document.getElementById('lj-np-status-label').innerText = 'On Air';
-                document.getElementById('lj-np-status-label').style.color = '';
+                document.getElementById('crjb-np-status-label').innerText = 'On Air';
+                document.getElementById('crjb-np-status-label').style.color = '';
             }
             countDisp.innerHTML = svgs.users + ' ' + d.data.listener_count;
             
             if (d.data.catalog_version && d.data.catalog_version > clientCatalogVersion) {
-                if (clientCatalogVersion !== 0) { loadCat(); if ('caches' in window) caches.delete(LJ_CACHE_NAME); }
+                if (clientCatalogVersion !== 0) { loadCat(); if ('caches' in window) caches.delete(CRJB_CACHE_NAME); }
                 clientCatalogVersion = d.data.catalog_version;
             }
 
@@ -439,14 +439,14 @@ document.addEventListener("DOMContentLoaded", function() {
             let uiId = root.dataset.currentSongId;
             if(uiId !== String(np.id) && !isPreviewing) {
                 root.dataset.currentSongId = np.id;
-                let eBadge = np.is_explicit ? '<span class="lj-explicit-badge">E</span>' : '';
+                let eBadge = np.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                 let sLink = escapeHTML(np.permalink);
                 let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
-                document.getElementById('lj-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
-                document.getElementById('lj-np-artist').innerHTML = '<span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(np.artist) + '</span>';
+                document.getElementById('crjb-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
+                document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(np.artist) + '</span>';
                 
-                let tipContainer = document.getElementById('lj-np-tip-container');
-                let tipBtn = document.getElementById('lj-np-tip-btn');
+                let tipContainer = document.getElementById('crjb-np-tip-container');
+                let tipBtn = document.getElementById('crjb-np-tip-btn');
                 if (np.tip_url && !isPreviewing) {
                     tipBtn.href = escapeHTML(np.tip_url);
                     tipContainer.style.display = 'block';
@@ -454,8 +454,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     setTimeout(() => { tipBtn.style.transform = 'scale(1)'; }, 300);
                 } else { tipContainer.style.display = 'none'; }
 
-                let bannerEl = document.getElementById('lj-np-banner');
-                let bannerTextEl = document.getElementById('lj-np-banner-text');
+                let bannerEl = document.getElementById('crjb-np-banner');
+                let bannerTextEl = document.getElementById('crjb-np-banner-text');
                 if (np.banner) {
                     bannerEl.style.display = 'block'; bannerTextEl.innerHTML = np.banner; 
                 } else {
@@ -527,8 +527,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (!cId) { showNotification("Offline Mode active. Starting Local Radio.", "warning"); } 
                 else { showNotification("Connection lost. Switching to Local Buffer.", "warning"); }
 
-                document.getElementById('lj-np-status-label').innerText = 'Offline Mode';
-                document.getElementById('lj-np-status-label').style.color = '#dc3545';
+                document.getElementById('crjb-np-status-label').innerText = 'Offline Mode';
+                document.getElementById('crjb-np-status-label').style.color = '#dc3545';
                 
                 const currentPlayTime = live.currentTime;
                 const currentSong = cId ? catData.find(s => s.id === cId) : null;
@@ -558,34 +558,34 @@ document.addEventListener("DOMContentLoaded", function() {
 
     window.viewArtist = (artistName) => {
         currentArtistFilter = artistName; currentGenreFilter = null; 
-        document.getElementById('lj-filter-text').innerText = 'Showing tracks by: ' + artistName;
-        document.getElementById('lj-artist-filter-header').style.display = 'flex'; renderCat();
-        document.getElementById('lj-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
+        document.getElementById('crjb-filter-text').innerText = 'Showing tracks by: ' + artistName;
+        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
+        document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
     
     window.viewGenre = (genreName) => {
         currentGenreFilter = genreName; currentArtistFilter = null; 
-        document.getElementById('lj-filter-text').innerText = 'Showing genre: ' + genreName;
-        document.getElementById('lj-artist-filter-header').style.display = 'flex'; renderCat();
-        document.getElementById('lj-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
+        document.getElementById('crjb-filter-text').innerText = 'Showing genre: ' + genreName;
+        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
+        document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
 
     window.clearArtistFilter = () => { 
         currentArtistFilter = null; currentGenreFilter = null; 
-        document.getElementById('lj-artist-filter-header').style.display = 'none'; 
+        document.getElementById('crjb-artist-filter-header').style.display = 'none'; 
         renderCat(); 
     };
 
     function loadCat() { 
-        fetch(ajaxUrl + '?action=lj_get_catalog&security=' + securityNonce + '&station=' + stationId).then(r => r.json()).then(async d => { 
+        fetch(ajaxUrl + '?action=crjb_get_catalog&security=' + securityNonce + '&station=' + stationId).then(r => r.json()).then(async d => { 
             if(d.success) { 
                 catData = d.data.catalog; 
-                localStorage.setItem('lj_offline_catalog_' + stationId, JSON.stringify(catData));
+                localStorage.setItem('crjb_offline_catalog_' + stationId, JSON.stringify(catData));
                 await refreshCacheSet();
                 renderCat(); 
             } 
         }).catch(async e => {
-            const savedCat = localStorage.getItem('lj_offline_catalog_' + stationId);
+            const savedCat = localStorage.getItem('crjb_offline_catalog_' + stationId);
             if (savedCat) {
                 catData = JSON.parse(savedCat);
                 await refreshCacheSet();
@@ -595,7 +595,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function renderCat() {
-        const l = document.getElementById('lj-catalog-list'), s = document.getElementById('lj-catalog-sort').value;
+        const l = document.getElementById('crjb-catalog-list'), s = document.getElementById('crjb-catalog-sort').value;
         const showAvailable = availableOnlyCheckbox.checked;
 
         let sorted = [...catData];
@@ -673,32 +673,32 @@ document.addEventListener("DOMContentLoaded", function() {
         sorted.forEach(s => {
             let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
             let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
-            let eBadge = s.is_explicit ? '<span class="lj-explicit-badge" title="Explicit Content">E</span>' : '';
+            let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
             
-            if (s.is_locked_by_schedule) { badge = '<div class="lj-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
-            else if (s.is_playing) { badge = '<div class="lj-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>'; } 
-            else if (s.cooldown > 0) { badge = '<div class="lj-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
+            if (s.is_locked_by_schedule) { badge = '<div class="crjb-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
+            else if (s.is_playing) { badge = '<div class="crjb-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>'; } 
+            else if (s.cooldown > 0) { badge = '<div class="crjb-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
             
             let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
-            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="lj-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
+            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
             
             let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
 
             let genresArray = s.genre ? s.genre.split(', ') : [];
-            let gBadge = genresArray.length > 0 ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="lj-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>' : '';
+            let gBadge = genresArray.length > 0 ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="crjb-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>' : '';
 
             let voteBtnHtml = votedIds.includes(s.id)
-                ? '<button class="lj-btn lj-btn-vote lj-voted" disabled>' + svgs.check + '</button>'
-                : '<button class="lj-btn lj-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
+                ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + '</button>'
+                : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
 
-            l.innerHTML += '<li class="lj-track-item ' + (isLocked ? 'lj-locked' : '') + '"><div class="lj-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="lj-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="lj-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
+            l.innerHTML += '<li class="crjb-track-item ' + (isLocked ? 'crjb-locked' : '') + '"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
         });
     }
     
     function stopPreview() {
         isPreviewing = false; currentPreviewUrl = ''; prev.pause(); prev.removeAttribute('src');
-        document.getElementById('lj-np-status-label').innerText = isOffline ? 'Offline Mode' : 'On Air';
-        document.getElementById('lj-np-status-label').style.color = isOffline ? '#dc3545' : '';
+        document.getElementById('crjb-np-status-label').innerText = isOffline ? 'Offline Mode' : 'On Air';
+        document.getElementById('crjb-np-status-label').style.color = isOffline ? '#dc3545' : '';
         if (stopPreviewBtn) stopPreviewBtn.style.display = 'none';
         root.dataset.currentSongId = null; 
         
@@ -722,11 +722,11 @@ document.addEventListener("DOMContentLoaded", function() {
         if(isSync) live.pause(); 
         
         isPreviewing = true; currentPreviewUrl = u;
-        document.getElementById('lj-np-status-label').innerText = 'Local Broadcast'; document.getElementById('lj-np-status-label').style.color = '#28a745';
-        document.getElementById('lj-np-title').innerText = title; document.getElementById('lj-np-artist').innerHTML = artist;
-        document.getElementById('lj-np-tip-container').style.display = 'none'; 
+        document.getElementById('crjb-np-status-label').innerText = 'Local Broadcast'; document.getElementById('crjb-np-status-label').style.color = '#28a745';
+        document.getElementById('crjb-np-title').innerText = title; document.getElementById('crjb-np-artist').innerHTML = artist;
+        document.getElementById('crjb-np-tip-container').style.display = 'none'; 
         
-        var existingBanner = document.getElementById('lj-np-banner');
+        var existingBanner = document.getElementById('crjb-np-banner');
         if(existingBanner) existingBanner.style.display = 'none';
         
         if (stopPreviewBtn) stopPreviewBtn.style.display = 'block';
@@ -746,14 +746,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
         prev.play().catch(e=>{}); 
         prev.ontimeupdate = () => { 
-            if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('lj-np-time').innerHTML = svgs.stopwatch + ' 0:' + (rem<0?0:rem).toString().padStart(2,'0'); }
+            if(isPreviewing) { let rem = 30 - Math.floor(prev.currentTime); document.getElementById('crjb-np-time').innerHTML = svgs.stopwatch + ' 0:' + (rem<0?0:rem).toString().padStart(2,'0'); }
             if(prev.currentTime >= 30) stopPreview();
         }; 
     };
     
     window.voteSong = (id, title) => { 
         const f = new FormData(); 
-        f.append('action', 'lj_vote'); f.append('song_id', id); f.append('security', securityNonce); f.append('station', stationId);
+        f.append('action', 'crjb_vote'); f.append('song_id', id); f.append('security', securityNonce); f.append('station', stationId);
         fetch(ajaxUrl, { method: 'POST', body: f }).then(r => r.json()).then(d => { 
             if(!d.success) showNotification(d.data, 'danger'); 
             else { 
@@ -765,5 +765,5 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     
     poll(); loadCat(); setInterval(loadCat, 60000); setInterval(poll, 5000);
-    document.getElementById('lj-catalog-sort').onchange = renderCat;
+    document.getElementById('crjb-catalog-sort').onchange = renderCat;
 });
