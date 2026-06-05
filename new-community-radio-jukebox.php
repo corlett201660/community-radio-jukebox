@@ -812,6 +812,7 @@ function crjb_song_details_callback( $post ) {
                 <input type="url" id="intro_audio_url" name="intro_audio_url" value="<?php echo esc_attr($intro_audio_url); ?>" style="flex-grow: 1;" readonly placeholder="Plays before the song starts..." />
                 <input type="hidden" id="crjb_intro_attachment_id" name="crjb_intro_attachment_id" value="" />
                 <button type="button" class="button button-secondary crjb_upload_memo_btn" data-target="intro">Select Intro</button>
+                <button type="button" class="button crjb_clear_memo_btn" data-target="intro">Clear</button>
             </div>
         </td></tr>
         <tr><th><label>Outro Voice Memo (DJ Drop)</label></th><td>
@@ -819,6 +820,7 @@ function crjb_song_details_callback( $post ) {
                 <input type="url" id="outro_audio_url" name="outro_audio_url" value="<?php echo esc_attr($outro_audio_url); ?>" style="flex-grow: 1;" readonly placeholder="Plays after the song ends..." />
                 <input type="hidden" id="crjb_outro_attachment_id" name="crjb_outro_attachment_id" value="" />
                 <button type="button" class="button button-secondary crjb_upload_memo_btn" data-target="outro">Select Outro</button>
+                <button type="button" class="button crjb_clear_memo_btn" data-target="outro">Clear</button>
             </div>
         </td></tr>
         <tr>
@@ -855,6 +857,13 @@ function crjb_song_details_callback( $post ) {
                 $('#' + target + '_audio_url').val(attachment.url);
             });
             memoUploader.open();
+        });
+
+        $('.crjb_clear_memo_btn').click(function(e) {
+            e.preventDefault();
+            var target = $(this).data('target');
+            $('#crjb_' + target + '_attachment_id').val('');
+            $('#' + target + '_audio_url').val('');
         });
 
         $('#crjb_gemini_scan_btn').click(function(e) {
@@ -1802,7 +1811,7 @@ function crjb_render_frontend_app($atts) {
     <div id="crjb-alert-container"></div>
 
     <div class="crjb-app-container" id="crjb-app-root" data-theme="light">
-        <div style="display:flex; justify-content:space-between; border-bottom:2px solid var(--lj-border); margin-bottom:20px; padding-bottom:10px; align-items:center; flex-wrap:wrap; gap: 10px;">
+        <div style="display:flex; justify-content:space-between; border-bottom:2px solid var(--crjb-border); margin-bottom:20px; padding-bottom:10px; align-items:center; flex-wrap:wrap; gap: 10px;">
             <div>
                 <h2 style="margin:0; font-size:22px; display:flex; align-items:center;">
                     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> 
@@ -1810,7 +1819,7 @@ function crjb_render_frontend_app($atts) {
                 </h2>
                 <div class="crjb-station-badge" id="crjb-station-badge-text" title="Active Filters"><?php echo esc_html($station_label); ?></div>
             </div>
-            <div style="display:flex; gap:15px; font-size:20px; color:var(--lj-accent);">
+            <div style="display:flex; gap:15px; font-size:20px; color:var(--crjb-accent);">
                 <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></a><?php endif; ?>
                 <div id="crjb-catalog-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Toggle Catalog"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></div>
                 <div id="crjb-schedule-toggle" style="cursor:pointer; display:flex; align-items:center;" title="View Schedule"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
@@ -1823,8 +1832,8 @@ function crjb_render_frontend_app($atts) {
             
             <div class="crjb-dashboard-column crjb-sticky-pane">
                 
-                <div id="crjb-info-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
-                    <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--lj-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> Community Radio Jukebox</p>
+                <div id="crjb-info-panel" style="display:none; background:var(--crjb-bg); border:1px solid var(--crjb-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
+                    <p style="font-weight:800; margin-bottom:10px; font-size:15px; color:var(--crjb-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> Community Radio Jukebox</p>
                     <ul style="padding-left:20px; margin-bottom:0;">
                         <li style="margin-bottom:6px;"><strong>Connect:</strong> Lock your audio exactly in sync with everyone else in town.</li>
                         <li style="margin-bottom:6px;"><strong>Voting:</strong> You get <strong>10 votes per hour</strong>. Use them to boost your favorite tracks.</li>
@@ -1832,21 +1841,21 @@ function crjb_render_frontend_app($atts) {
                     </ul>
                 </div>
 
-                <div id="crjb-schedule-panel" style="display:none; background:var(--lj-bg); border:1px solid var(--lj-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
-                    <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--lj-border); padding-bottom:10px; margin-bottom:10px; display:flex; align-items:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Upcoming Events</h3>
+                <div id="crjb-schedule-panel" style="display:none; background:var(--crjb-bg); border:1px solid var(--crjb-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left;">
+                    <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--crjb-border); padding-bottom:10px; margin-bottom:10px; display:flex; align-items:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> Upcoming Events</h3>
                     <ul style="list-style:none; padding:0; margin:0;" id="crjb-schedule-list">
-                        <li style="color:var(--lj-sec); font-style:italic;">Loading schedule...</li>
+                        <li style="color:var(--crjb-sec); font-style:italic;">Loading schedule...</li>
                     </ul>
                 </div>
 
-                <div class="crjb-now-playing" id="crjb-np-panel" style="text-align:center; padding:15px; background:var(--lj-panel); border-radius:16px; border-left:6px solid var(--lj-accent);">
+                <div class="crjb-now-playing" id="crjb-np-panel" style="text-align:center; padding:15px; background:var(--crjb-panel); border-radius:16px; border-left:6px solid var(--crjb-accent);">
                     <div style="display:flex; justify-content: space-between; font-size: 11px; font-weight: 800; text-transform: uppercase;">
-                        <span id="crjb-np-status-label" style="color: var(--lj-accent);">On Air</span>
-                        <span id="crjb-listener-count" style="color: var(--lj-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> 0</span>
+                        <span id="crjb-np-status-label" style="color: var(--crjb-accent);">On Air</span>
+                        <span id="crjb-listener-count" style="color: var(--crjb-accent); display:flex; align-items:center;"><svg width="1.2em" height="1.2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg> 0</span>
                     </div>
                     <h3 id="crjb-np-title" style="margin:12px 0 4px 0; font-size: 20px;">Awaiting...</h3>
-                    <p id="crjb-np-artist" style="margin:0; color: var(--lj-sec); font-weight:600;">...</p>
-                    <div id="crjb-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--lj-sec); display:flex; align-items:center; justify-content:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M12 2v20"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.5 3.5a10 10 0 0 0 0 13"></path><path d="M18.5 3.5a10 10 0 0 1 0 13"></path></svg> --:--</div>
+                    <p id="crjb-np-artist" style="margin:0; color: var(--crjb-sec); font-weight:600;">...</p>
+                    <div id="crjb-np-time" style="font-size:14px; margin-top:10px; font-weight:800; color: var(--crjb-sec); display:flex; align-items:center; justify-content:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M12 2v20"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.5 3.5a10 10 0 0 0 0 13"></path><path d="M18.5 3.5a10 10 0 0 1 0 13"></path></svg> --:--</div>
                     
                     <div id="crjb-np-tip-container" style="display:none; margin: 20px 0 10px 0;">
                         <a id="crjb-np-tip-btn" href="#" target="_blank" class="w-100 btn btn-warning btn-lg" style="display:flex; justify-content:center; align-items:center; background: #ffaa00; color: #000; font-weight: 800; border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.3); transition: transform 0.2s;">
@@ -1879,12 +1888,12 @@ function crjb_render_frontend_app($atts) {
                             <label style="font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; margin:0;">
                                 <input type="checkbox" id="crjb-available-only" style="margin:0; cursor:pointer;"> Available Only
                             </label>
-                            <select id="crjb-catalog-sort" style="padding:6px; border-radius:8px; font-size:12px; background:var(--lj-panel); color:inherit; border:1px solid var(--lj-border);">
+                            <select id="crjb-catalog-sort" style="padding:6px; border-radius:8px; font-size:12px; background:var(--crjb-panel); color:inherit; border:1px solid var(--crjb-border);">
                                 <option value="title">Title A-Z</option><option value="artist">Artist</option><option value="newest">Newest</option>
                             </select>
                         </div>
                     </div>
-                    <div id="crjb-artist-filter-header" style="display:none; justify-content:space-between; align-items:center; background:var(--lj-accent); color:#fff; padding:10px 15px; border-radius:12px; margin-bottom:12px;">
+                    <div id="crjb-artist-filter-header" style="display:none; justify-content:space-between; align-items:center; background:var(--crjb-accent); color:#fff; padding:10px 15px; border-radius:12px; margin-bottom:12px;">
                         <span style="font-weight:700; font-size:13px;" id="crjb-filter-text">Showing Artist</span>
                         <button onclick="clearArtistFilter()" style="display:flex; align-items:center; background:rgba(0,0,0,0.2); border:none; color:#fff; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Clear</button>
                     </div>
