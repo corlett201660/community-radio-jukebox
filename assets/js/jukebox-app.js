@@ -157,7 +157,7 @@ document.addEventListener("DOMContentLoaded", function() {
             
             let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
             let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
-            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
+            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--crjb-sec); padding:10px 14px;">' + svgs.file + '</a>';
             
             let safeVoteTitle = sTitle.replace(/'/g, "\\'");
             let safeArtistQuote = sArtist.replace(/'/g, "\\'");
@@ -292,7 +292,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     
                     let eBadge = nextSong.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                     let sLink = escapeHTML(nextSong.permalink);
-                    let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
+                    let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--crjb-accent);" title="View Track Details">' + svgs.file + '</a>';
                     
                     document.getElementById('crjb-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
                     document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
@@ -340,7 +340,7 @@ document.addEventListener("DOMContentLoaded", function() {
                              cId = nextSong.id; root.dataset.currentSongId = nextSong.id;
                              let eBadge = nextSong.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                              let sLink = escapeHTML(nextSong.permalink);
-                             let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
+                             let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--crjb-accent);" title="View Track Details">' + svgs.file + '</a>';
                              
                              document.getElementById('crjb-np-title').innerHTML = escapeHTML(nextSong.title) + ' ' + eBadge + lyricsLink; 
                              document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(nextSong.artist) + '</span>';
@@ -372,7 +372,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 const sl = document.getElementById('crjb-schedule-list');
                 if (sl) {
                     if (d.data.upcoming_events.length === 0) {
-                        sl.innerHTML = '<li style="color:var(--lj-sec); font-style:italic;">No upcoming events scheduled. Enjoy Open Play!</li>';
+                        sl.innerHTML = '<li style="color:var(--crjb-sec); font-style:italic;">No upcoming events scheduled. Enjoy Open Play!</li>';
                     } else {
                         sl.innerHTML = '';
                         d.data.upcoming_events.forEach(ev => {
@@ -391,10 +391,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
                             sl.innerHTML += '<li style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.05);">' +
                                 '<div>' +
-                                    '<strong style="display:block; color:var(--lj-accent); font-size:14px;">' + escapeHTML(ev.title) + '</strong>' +
-                                    '<span style="color:var(--lj-sec); font-size:12px;">' + timeFmt + '</span>' +
+                                    '<strong style="display:block; color:var(--crjb-accent); font-size:14px;">' + escapeHTML(ev.title) + '</strong>' +
+                                    '<span style="color:var(--crjb-sec); font-size:12px;">' + timeFmt + '</span>' +
                                 '</div>' +
-                                '<div style="background:var(--lj-panel); padding:4px 10px; border-radius:8px; font-weight:700; font-size:11px; border:1px solid var(--lj-border);">' + dayLabel + '</div>' +
+                                '<div style="background:var(--crjb-panel); padding:4px 10px; border-radius:8px; font-weight:700; font-size:11px; border:1px solid var(--crjb-border);">' + dayLabel + '</div>' +
                             '</li>';
                         });
                     }
@@ -441,7 +441,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 root.dataset.currentSongId = np.id;
                 let eBadge = np.is_explicit ? '<span class="crjb-explicit-badge">E</span>' : '';
                 let sLink = escapeHTML(np.permalink);
-                let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--lj-accent);" title="View Track Details">' + svgs.file + '</a>';
+                let lyricsLink = '<a href="' + sLink + '" target="_blank" style="margin-left:8px; font-size:14px; color:var(--crjb-accent);" title="View Track Details">' + svgs.file + '</a>';
                 document.getElementById('crjb-np-title').innerHTML = escapeHTML(np.title) + ' ' + eBadge + lyricsLink; 
                 document.getElementById('crjb-np-artist').innerHTML = '<span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + escapeHTML(np.artist) + '</span>';
                 
@@ -651,10 +651,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                     
                     if (nextUnlockTs !== Infinity) {
-                        emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--lj-sec); background:var(--lj-panel); border:1px dashed var(--lj-border); border-radius:12px; grid-column: 1 / -1;">' +
-                            '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--lj-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
-                            '<strong style="font-size:15px; color:var(--lj-text);">No tracks currently available</strong><br>' +
-                            '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--lj-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
+                        emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--crjb-sec); background:var(--crjb-panel); border:1px dashed var(--crjb-border); border-radius:12px; grid-column: 1 / -1;">' +
+                            '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--crjb-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
+                            '<strong style="font-size:15px; color:var(--crjb-text);">No tracks currently available</strong><br>' +
+                            '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--crjb-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
                         '</li>';
                     } else {
                         emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
@@ -676,11 +676,11 @@ document.addEventListener("DOMContentLoaded", function() {
             let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
             
             if (s.is_locked_by_schedule) { badge = '<div class="crjb-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
-            else if (s.is_playing) { badge = '<div class="crjb-cooldown-badge" style="background:var(--lj-accent); color:#fff;">ON AIR</div>'; } 
+            else if (s.is_playing) { badge = '<div class="crjb-cooldown-badge" style="background:var(--crjb-accent); color:#fff;">ON AIR</div>'; } 
             else if (s.cooldown > 0) { badge = '<div class="crjb-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
             
             let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
-            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--lj-sec); padding:10px 14px;">' + svgs.file + '</a>';
+            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--crjb-sec); padding:10px 14px;">' + svgs.file + '</a>';
             
             let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
 
