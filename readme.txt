@@ -1,7 +1,7 @@
 === Community Radio Jukebox ===
 Contributors: corlett201660
 Tags: audio, radio, player, music, gemini
-Requires at least: 6.0
+Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 7.4
 Stable tag: 4.60.2
