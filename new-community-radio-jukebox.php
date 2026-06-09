@@ -85,6 +85,7 @@ function crjb_register_settings() {
     register_setting('crjb_settings_group', 'crjb_exclude_licensed', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('crjb_settings_group', 'crjb_strict_event_mode', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('crjb_settings_group', 'crjb_submission_url', ['type' => 'string', 'sanitize_callback' => 'esc_url_raw']);
+    register_setting('crjb_settings_group', 'crjb_wipe_on_uninstall', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
 }
 
 function crjb_settings_page() {
@@ -134,6 +135,13 @@ function crjb_settings_page() {
                     <th scope="row">Submission URL</th>
                     <td>
                         <input type="url" name="crjb_submission_url" value="<?php echo esc_attr(get_option('crjb_submission_url')); ?>" class="regular-text" placeholder="https://dropbox.com/... or Google Drive link" />
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row" style="color: #d63638;">Wipe Data on Uninstall</th>
+                    <td>
+                        <input type="checkbox" name="crjb_wipe_on_uninstall" value="1" <?php checked(1, get_option('crjb_wipe_on_uninstall'), true); ?> />
+                        <label>If checked, ALL plugin data (songs, schedules, AI data, and logs) will be permanently deleted from the database when the plugin is deleted.</label>
                     </td>
                 </tr>
             </table>
@@ -1107,22 +1115,26 @@ function crjb_validate_station_id($station_id) {
 
 function crjb_get_explicit_meta_query() {
     if (!get_option('crjb_allow_explicit', 1)) {
+        // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_query
         return [
             'relation' => 'OR',
             ['key' => 'crjb_is_explicit', 'compare' => 'NOT EXISTS'],
             ['key' => 'crjb_is_explicit', 'value' => '1', 'compare' => '!=']
         ];
+        // phpcs:enable
     }
     return [];
 }
 
 function crjb_get_license_meta_query() {
     if (get_option('crjb_exclude_licensed', 0)) {
+        // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_query
         return [
             'relation' => 'OR',
             ['key' => 'crjb_royalty_free', 'value' => '1', 'compare' => '='],
             ['key' => 'crjb_license_override', 'value' => '1', 'compare' => '=']
         ];
+        // phpcs:enable
     }
     return [];
 }
@@ -1218,6 +1230,7 @@ function crjb_get_next_schedule_timestamp($sched_id) {
 function crjb_get_base_station_args($station_id) {
     if ($station_id === 'global') return [];
     
+    // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_tax_query
     $tax_query = ['relation' => 'AND'];
     $active_atts = get_option('crjb_station_args_' . $station_id, []);
     
@@ -1239,18 +1252,21 @@ function crjb_get_base_station_args($station_id) {
 
     if (count($tax_query) > 1) return ['tax_query' => $tax_query];
     return [];
+    // phpcs:enable
 }
 
 function crjb_get_current_station_args($station_id) {
     if ($station_id === 'global') {
         $schedule = crjb_get_active_schedule();
         if ($schedule) {
+            // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_tax_query
             $tax_query = ['relation' => 'AND'];
             if (!empty($schedule['playlist'])) $tax_query[] = [ 'taxonomy' => 'crjb_playlist', 'field' => 'slug', 'terms' => array_map('sanitize_title', explode(',', $schedule['playlist'])), 'operator' => 'IN' ];
             if (!empty($schedule['artist'])) $tax_query[] = [ 'taxonomy' => 'crjb_artist', 'field' => 'slug', 'terms' => array_map('sanitize_title', explode(',', $schedule['artist'])), 'operator' => 'IN' ];
             if (!empty($schedule['genre'])) $tax_query[] = [ 'taxonomy' => 'crjb_genre', 'field' => 'slug', 'terms' => array_map('sanitize_title', explode(',', $schedule['genre'])), 'operator' => 'IN' ];
             if (count($tax_query) > 1) return ['tax_query' => $tax_query];
             return [];
+            // phpcs:enable
         }
     }
     return crjb_get_base_station_args($station_id);
@@ -1262,6 +1278,7 @@ function crjb_get_station_label($station_id) {
         if ($schedule) return 'LIVE: ' . $schedule['title'];
         
         if (get_option('crjb_strict_event_mode')) {
+            // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_query
             $has_overrides = get_posts([
                 'post_type' => 'crjb_song',
                 'meta_query' => [
@@ -1270,6 +1287,7 @@ function crjb_get_station_label($station_id) {
                 'posts_per_page' => 1,
                 'fields' => 'ids'
             ]);
+            // phpcs:enable
             if ($has_overrides) return 'Global Broadcast';
             return 'Requests Offline (No Event)';
         }
@@ -1384,6 +1402,8 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
         } else {
             $history_keys = !empty($history) ? array_keys($history) : [0];
             
+            // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+            // phpcs:disable WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in
             $query_args = [
                 'post_type' => 'crjb_song', 
                 'posts_per_page' => 1, 
@@ -1434,6 +1454,7 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
                     $fallback = $is_open_play ? crjb_get_open_play_fallback($query_args, $all_schedules) : get_posts($query_args);
                 }
             }
+            // phpcs:enable
             
             if ($fallback) {
                 $id = $fallback[0]->ID;
@@ -1555,7 +1576,7 @@ function crjb_get_state() {
         $submitter = !empty($submitter_terms) ? implode(', ', $submitter_terms) : '';
         $banner = !empty($custom_banner) ? $custom_banner : (!empty($submitter) ? 'Submitted by: ' . $submitter : '');
 
-        $fq[] = ['id' => $sid, 'title' => html_entity_decode(get_the_title($sid)), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'crjb_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($sid, 'crjb_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($sid, 'crjb_lyrics', true)), 'banner' => $banner, 'tip_url' => get_post_meta($sid, 'crjb_tip_url', true), 'genre' => implode(', ', wp_get_post_terms($sid, 'crjb_genre', ['fields' => 'names']) ?: []), 'votes' => $d['votes'], 'preview_url' => get_post_meta($sid, 'preview_url', true), 'url' => get_post_meta($sid, 'full_audio_url', true), 'permalink' => get_permalink($sid) ];
+        $fq[] = ['id' => $sid, 'title' => html_entity_decode(get_the_title($sid)), 'artist' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'crjb_artist', ['fields' => 'names']) ?: ['Unknown'])), 'is_explicit' => get_post_meta($sid, 'crjb_is_explicit', true) ? true : false, 'has_lyrics' => !empty(get_post_meta($sid, 'crjb_lyrics', true)), 'banner' => $banner, 'tip_url' => get_post_meta($sid, 'crjb_tip_url', true), 'genre' => html_entity_decode(implode(', ', wp_get_post_terms($sid, 'crjb_genre', ['fields' => 'names']) ?: []), ENT_QUOTES, 'UTF-8'), 'votes' => $d['votes'], 'preview_url' => get_post_meta($sid, 'preview_url', true), 'url' => get_post_meta($sid, 'full_audio_url', true), 'permalink' => get_permalink($sid) ];
     }
     
     $np = null;
@@ -1624,6 +1645,7 @@ function crjb_get_catalog() {
     
     $station_id = crjb_validate_station_id($station_id);
     
+    // phpcs:disable WordPress.DB.SlowDBQuery.slow_db_query_meta_query
     $query_args = ['post_type' => 'crjb_song', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC', 'meta_query' => []];
     
     $explicit_block = crjb_get_explicit_meta_query();
@@ -1638,6 +1660,8 @@ function crjb_get_catalog() {
     }
     
     $songs = get_posts($query_args);
+    // phpcs:enable
+    
     $history = get_option("crjb_play_history_{$station_id}", []); 
     $current = get_option("crjb_now_playing_sync_{$station_id}"); 
     $now = time(); 
@@ -1754,7 +1778,7 @@ function crjb_get_catalog() {
             'id' => $p->ID, 
             'title' => html_entity_decode($p->post_title), 
             'artist' => html_entity_decode(implode(', ', wp_get_post_terms($p->ID, 'crjb_artist', ['fields' => 'names']) ?: ['Unknown Artist'])), 
-            'genre' => implode(', ', wp_get_post_terms($p->ID, 'crjb_genre', ['fields' => 'names']) ?: []), 
+            'genre' => html_entity_decode(implode(', ', wp_get_post_terms($p->ID, 'crjb_genre', ['fields' => 'names']) ?: []), ENT_QUOTES, 'UTF-8'), 
             'is_explicit' => $is_explicit,
             'has_lyrics' => $has_lyrics,
             'banner' => $banner,
