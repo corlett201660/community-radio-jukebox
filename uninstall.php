@@ -4,20 +4,20 @@
  * Cleans up all Jukebox settings, logs, transients, and custom post types.
  */
 
-// Exit if uninstall is not called from WordPress.
+// Exit if uninstall is not called from WordPress directly.
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
     exit;
 }
 
 // THE GATEKEEPER: Check if the user explicitly opted to wipe data
 if ( ! get_option( 'crjb_wipe_on_uninstall' ) ) {
-    // If they didn't check the box, silently exit and preserve all data.
-    exit;
+    // If they didn't check the box, skip data deletion but allow WordPress to delete the files.
+    return;
 }
 
 global $wpdb;
 
-// 1. Delete standard static options (Fixed global prefixing)
+// 1. Delete standard static options
 $crjb_options_to_delete = [
     'crjb_enable_submissions',
     'crjb_allow_explicit',
@@ -60,3 +60,9 @@ if ( ! empty( $crjb_posts ) ) {
         wp_delete_post( $crjb_post_id, true ); 
     }
 }
+
+// 4. (Optional) Clear any scheduled cron hooks related to Jukebox
+// wp_clear_scheduled_hook( 'your_crjb_cron_hook_name' );
+
+// 5. Flush the persistent object cache to ensure deleted options are removed from memory
+wp_cache_flush();
