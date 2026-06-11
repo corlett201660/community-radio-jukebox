@@ -720,8 +720,22 @@ function crjb_tutorial_page() {
         <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #17a2b8; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
             <h2 style="margin-top: 0;">6. "Available Only" & Predictive Empty States</h2>
             <p>To prevent "scroll fatigue", patrons can toggle the <strong>Available Only</strong> checkbox in the catalog to hide tracks that are currently playing, on cooldown, or locked until a future event.</p>
-            <p>If they toggle this on when no songs are available, the Jukebox will scan ahead and display a <strong>Predictive Empty State</strong>, letting them know the exact time (or event) when the next track will become playable (e.g., "Next track available at 8:15 PM" or "Unlocks at Royalty Hour").</p>
+            <p>If they toggle this on when no songs are available, the Jukebox will scan ahead and display a <strong>Predictive Empty State</strong>, letting them know the exact time (or event) when the next track will become playable.</p>
         </div>
+
+        <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #fd7e14; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
+            <h2 style="margin-top: 0;">7. Artist Submissions & Bulk Importing</h2>
+            <p>Empower your local community to contribute their original music directly to your library! Enable Submissions in the settings, then place this shortcode on any page:</p>
+            <p><code style="font-size: 16px; padding: 5px 10px; background: #f0f0f1; border-radius: 4px;">[crjb_submit_mp3]</code></p>
+            <p>Once artists upload their files, simply navigate to the <strong>Jukebox Settings</strong> page and click <strong>Scan & Import MP3s</strong>. The system will instantly turn them into Draft songs, ready for you to review, run the AI Scanner, and publish!</p>
+        </div>
+
+        <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #6f42c1; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
+            <h2 style="margin-top: 0;">8. AI Radio Host & DJ Drops</h2>
+            <p>Bring your station to life with dynamic vocal drops! You can upload your own custom Intro and Outro voice memos on any song's edit page.</p>
+            <p>Alternatively, enable the <strong>AI Radio Host</strong> in your settings. Whenever you add a "Custom Scrolling Banner" to a track (e.g., "Happy Birthday Sarah!"), Gemini's text-to-speech engine will instantly generate a polished radio voice reading your banner, seamlessly injecting it before or after the song plays.</p>
+        </div>
+
     </div>
     <?php
 }
@@ -2148,4 +2162,150 @@ function crjb_render_frontend_app($atts) {
     ]);
 
     return ob_get_clean();
+}
+
+// ==========================================
+// 6. FRONTEND VISITOR MP3 UPLOADER
+// ==========================================
+
+add_shortcode('crjb_submit_mp3', 'crjb_render_frontend_uploader_shortcode');
+
+function crjb_render_frontend_uploader_shortcode() {
+    // Only allow rendering if the admin enabled submissions in the Jukebox settings
+    if (get_option('crjb_enable_submissions') != '1') {
+        return '<p>Song submissions are currently closed.</p>';
+    }
+
+    ob_start();
+    ?>
+    <div id="crjb-upload-container" style="max-width: 450px; margin: 0 auto; padding: 25px; background: #fff; border-radius: 16px; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: system-ui, sans-serif;">
+        <h3 style="margin-top: 0; font-size: 20px; font-weight: 800; color: #222; margin-bottom: 15px;">Submit Your Track</h3>
+        <p style="font-size: 14px; color: #555; margin-bottom: 20px;">Upload your original music (MP3 format only). Our team will review the track before adding it to the public jukebox queue.</p>
+        
+        <div id="crjb-upload-alert" style="display:none; padding: 12px; margin-bottom: 20px; border-radius: 8px; font-weight: 600; font-size: 14px;"></div>
+        
+        <form id="crjb-upload-form" enctype="multipart/form-data">
+            <?php wp_nonce_field('crjb_frontend_upload_action', 'crjb_upload_nonce'); ?>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Select MP3 File</label>
+                <input type="file" id="crjb_audio_file" name="crjb_audio_file" accept=".mp3,audio/mpeg" required style="width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa;">
+            </div>
+            
+            <button type="submit" id="crjb-upload-submit" style="background: #0073aa; color: #fff; padding: 14px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 15px; width: 100%; transition: background 0.2s;">
+                Upload Track
+            </button>
+        </form>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('crjb-upload-form');
+        const alertBox = document.getElementById('crjb-upload-alert');
+        const submitBtn = document.getElementById('crjb-upload-submit');
+
+        if(form) {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const fileInput = document.getElementById('crjb_audio_file');
+                if (!fileInput.files.length) return;
+
+                // Client-side file size limit check (e.g., 25MB max)
+                const fileSize = fileInput.files[0].size / 1024 / 1024;
+                if (fileSize > 25) {
+                    alertBox.style.display = 'block';
+                    alertBox.style.backgroundColor = '#f8d7da';
+                    alertBox.style.color = '#721c24';
+                    alertBox.innerText = 'File is too large. Please upload an MP3 under 25MB.';
+                    return;
+                }
+
+                const formData = new FormData(form);
+                formData.append('action', 'crjb_process_visitor_upload');
+
+                submitBtn.innerText = 'Uploading... Please wait.';
+                submitBtn.style.opacity = '0.7';
+                submitBtn.disabled = true;
+                alertBox.style.display = 'none';
+
+                fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alertBox.style.display = 'block';
+                    if (data.success) {
+                        alertBox.style.backgroundColor = '#d4edda';
+                        alertBox.style.color = '#155724';
+                        alertBox.style.border = '1px solid #c3e6cb';
+                        alertBox.innerText = 'Success! Your track has been uploaded securely.';
+                        form.reset();
+                    } else {
+                        alertBox.style.backgroundColor = '#f8d7da';
+                        alertBox.style.color = '#721c24';
+                        alertBox.style.border = '1px solid #f5c6cb';
+                        alertBox.innerText = 'Error: ' + data.data;
+                    }
+                })
+                .catch(error => {
+                    alertBox.style.display = 'block';
+                    alertBox.style.backgroundColor = '#f8d7da';
+                    alertBox.style.color = '#721c24';
+                    alertBox.innerText = 'A network error occurred. The file may be larger than your server limits allow.';
+                })
+                .finally(() => {
+                    submitBtn.innerText = 'Upload Track';
+                    submitBtn.style.opacity = '1';
+                    submitBtn.disabled = false;
+                });
+            });
+        }
+    });
+    </script>
+    <?php
+    return ob_get_clean();
+}
+
+add_action('wp_ajax_crjb_process_visitor_upload', 'crjb_process_visitor_upload_handler');
+add_action('wp_ajax_nopriv_crjb_process_visitor_upload', 'crjb_process_visitor_upload_handler');
+
+function crjb_process_visitor_upload_handler() {
+    // 1. Strict Nonce & Security Verification
+    if (!isset($_POST['crjb_upload_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['crjb_upload_nonce'])), 'crjb_frontend_upload_action')) {
+        wp_send_json_error('Security check failed. Please refresh the page and try again.');
+    }
+
+    if (get_option('crjb_enable_submissions') != '1') {
+        wp_send_json_error('Submissions are currently closed.');
+    }
+
+    if (empty($_FILES['crjb_audio_file']) || $_FILES['crjb_audio_file']['error'] !== UPLOAD_ERR_OK) {
+        wp_send_json_error('No valid file was uploaded, or the file exceeded the server upload limit.');
+    }
+
+    $file = $_FILES['crjb_audio_file'];
+
+    // 2. Strict MIME Type Validation
+    $allowed_mimes = ['audio/mpeg', 'audio/mp3'];
+    $file_type = wp_check_filetype($file['name'], ['mp3' => 'audio/mpeg']);
+    
+    if (!in_array($file_type['type'], $allowed_mimes, true)) {
+        wp_send_json_error('Invalid file type. Only MP3 audio files are allowed.');
+    }
+
+    // 3. Import Core WordPress Media Handlers
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+
+    // 4. Safely handle the upload and create the Media Library Attachment
+    $attachment_id = media_handle_upload('crjb_audio_file', 0);
+
+    if (is_wp_error($attachment_id)) {
+        wp_send_json_error($attachment_id->get_error_message());
+    }
+
+    wp_send_json_success('File successfully uploaded to the Media Library.');
 }
