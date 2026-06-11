@@ -198,10 +198,45 @@ function crjb_settings_page() {
                 </td>
             </tr>
         </table>
+
+        <hr style="margin: 30px 0;">
+        <h2>Media Library Import</h2>
+        <table class="form-table">
+            <tr>
+                <th scope="row">Import Unlinked MP3s</th>
+                <td>
+                    <button type="button" id="crjb_import_mp3s_btn" class="button button-primary">Scan & Import MP3s</button>
+                    <span id="crjb_import_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
+                    <p class="description">Scans the WordPress Media Library for MP3s that haven't been added to the Jukebox yet. Creates a new Song entry for each, using the filename as the track title.</p>
+                </td>
+            </tr>
+        </table>
     </div>
 
     <script>
     jQuery(document).ready(function($){
+        $('#crjb_import_mp3s_btn').click(function(e) {
+            e.preventDefault();
+            if(!confirm('Scan the media library and import unlinked MP3s as new songs?')) return;
+            
+            let btn = $(this);
+            let status = $('#crjb_import_status');
+            btn.prop('disabled', true);
+            status.css('color', '#000').text('Scanning media library...');
+
+            $.post(ajaxurl, { action: 'crjb_import_media_library', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
+                if(res.success) {
+                    status.css('color', '#28a745').text(res.data.msg);
+                } else {
+                    status.css('color', '#d63638').text('Error: ' + res.data);
+                }
+                btn.prop('disabled', false);
+            }).fail(function() {
+                status.css('color', '#d63638').text('Server timeout or error. Check PHP error logs.');
+                btn.prop('disabled', false);
+            });
+        });
+
         $('#crjb_bulk_scan_btn').click(function(e) {
             e.preventDefault();
             if(!confirm('This will scan a batch of 10 incomplete audio files via the Gemini API. This may take a minute. Proceed?')) return;
@@ -265,6 +300,85 @@ function crjb_settings_page() {
 // ------------------------------------------
 // GEMINI API HANDLERS
 // ------------------------------------------
+
+add_action('wp_ajax_crjb_import_media_library', 'crjb_import_media_library_handler');
+function crjb_import_media_library_handler() {
+    // 1. Verify Security
+    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
+    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+
+    // 2. Identify already imported MP3s to prevent duplicates
+    global $wpdb;
+    $existing_ids_col = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_audio_attachment_id' AND meta_value != ''");
+    $existing_ids = array_map('intval', $existing_ids_col);
+
+    // 3. Query Media Library for unlinked MP3s
+    $args = [
+        'post_type'      => 'attachment',
+        'post_mime_type' => 'audio/mpeg',
+        'post_status'    => 'inherit',
+        'posts_per_page' => -1,
+        'fields'         => 'ids'
+    ];
+
+    if (!empty($existing_ids)) {
+        $args['post__not_in'] = $existing_ids;
+    }
+
+    $unlinked_mp3s = get_posts($args);
+
+    if (empty($unlinked_mp3s)) {
+        wp_send_json_success(['msg' => 'No unlinked MP3s found. Your catalog is up to date.']);
+    }
+
+    // 4. Loop, extract metadata, and create posts
+    $imported = 0;
+    foreach ($unlinked_mp3s as $attachment_id) {
+        $file_path = get_attached_file($attachment_id);
+        if (!$file_path) continue;
+
+        // Extract filename and clean it up for the title (removes dashes/underscores)
+        $filename = pathinfo($file_path, PATHINFO_FILENAME);
+        $clean_title = ucwords(str_replace(['_', '-'], ' ', $filename));
+
+        $post_data = [
+            'post_title'  => $clean_title,
+            'post_type'   => 'crjb_song',
+            'post_status' => 'draft',
+        ];
+
+        $new_song_id = wp_insert_post($post_data);
+
+        if (!is_wp_error($new_song_id)) {
+            $url = wp_get_attachment_url($attachment_id);
+            
+            // Map core audio metadata required by the JS frontend
+            update_post_meta($new_song_id, 'crjb_audio_attachment_id', $attachment_id);
+            update_post_meta($new_song_id, 'full_audio_url', esc_url_raw($url));
+            update_post_meta($new_song_id, 'preview_url', esc_url_raw($url));
+
+            // Extract exact duration from WP metadata
+            require_once( ABSPATH . 'wp-admin/includes/media.php' );
+            $meta = wp_read_audio_metadata($file_path);
+            if (!empty($meta['length'])) {
+                update_post_meta($new_song_id, 'audio_duration', ceil($meta['length']));
+            }
+            
+            // Set base safety defaults
+            update_post_meta($new_song_id, 'crjb_is_explicit', '0');
+            update_post_meta($new_song_id, 'crjb_royalty_free', '0');
+            update_post_meta($new_song_id, 'crjb_always_available', '0');
+
+            $imported++;
+        }
+    }
+
+    if ($imported > 0) {
+        update_option('crjb_catalog_version', time());
+    }
+
+    wp_send_json_success(['msg' => "Success! Imported {$imported} new MP3s as Drafts. You can now review them and use the Bulk Scanner."]);
+}
 
 add_action('wp_ajax_crjb_gemini_clear_all', 'crjb_gemini_clear_all_handler');
 function crjb_gemini_clear_all_handler() {
