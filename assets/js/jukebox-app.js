@@ -20,12 +20,27 @@ document.addEventListener("DOMContentLoaded", function() {
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
     localStorage.setItem('crjb_l_id', lId);
 
+    // --- Dynamic Pagination State (Window Width Based) ---
+    let currentPage = 1;
+    let itemsPerPage = window.innerWidth < 768 ? 10 : 25;
+
+    // Listen for device rotations to adjust the layout size automatically
+    window.addEventListener('resize', () => {
+        const newLimit = window.innerWidth < 768 ? 10 : 25;
+        if (itemsPerPage !== newLimit) {
+            itemsPerPage = newLimit;
+            currentPage = 1;
+            renderCat();
+        }
+    });
+
     const availableOnlyCheckbox = document.getElementById('crjb-available-only');
     const savedAvailableOnly = localStorage.getItem('crjb_available_only') === 'true';
     availableOnlyCheckbox.checked = savedAvailableOnly;
 
     availableOnlyCheckbox.addEventListener('change', (e) => {
         localStorage.setItem('crjb_available_only', e.target.checked);
+        currentPage = 1; // Reset to page 1 on filter change
         renderCat();
     });
 
@@ -103,8 +118,6 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     refreshCacheSet(); 
 
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
-
     if (infoToggleBtn && infoPanel) {
         infoToggleBtn.onclick = () => { 
             infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none'; 
@@ -149,8 +162,10 @@ document.addEventListener("DOMContentLoaded", function() {
     function renderQueueUI(queueArray) {
         let votedIds = getVotedSongs();
         const ql = document.getElementById('crjb-queue-list'); 
-        ql.innerHTML = '';
-        queueArray.forEach(s => {
+        
+        let htmlString = '';
+        // Slice the queue UI so massive queues don't break the page either
+        queueArray.slice(0, 25).forEach(s => {
             let sTitle = escapeHTML(s.title);
             let sArtist = escapeHTML(s.artist);
             let sLink = escapeHTML(s.permalink);
@@ -172,8 +187,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + ' ' + (s.votes || 0) + '</button>'
                 : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.arrowUp + ' ' + (s.votes || 0) + '</button>';
 
-            ql.innerHTML += '<li class="crjb-track-item"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
+            htmlString += '<li class="crjb-track-item"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
         });
+        
+        ql.innerHTML = htmlString;
     }
 
     async function bufferNextTracks(tracks) {
@@ -181,7 +198,9 @@ document.addEventListener("DOMContentLoaded", function() {
         const cache = await caches.open(CRJB_CACHE_NAME);
         let updated = false;
         
-        for (const song of tracks.slice(0, 5)) {
+        const cacheLimit = window.innerWidth < 768 ? 2 : 4;
+        
+        for (const song of tracks.slice(0, cacheLimit)) {
             if(song && song.url) {
                 const response = await cache.match(song.url);
                 if (!response) { try { await cache.add(song.url); updated = true; } catch(e) { } }
@@ -192,10 +211,10 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         }
 
-        if (catData && catData.length > 0) {
+        if (window.innerWidth >= 768 && catData && catData.length > 0) {
             let unCached = catData.filter(s => s.url && !cachedUrls.has(s.url));
             if (unCached.length > 0) {
-                unCached = unCached.sort(() => 0.5 - Math.random()).slice(0, 3);
+                unCached = unCached.sort(() => 0.5 - Math.random()).slice(0, 2);
                 for (const song of unCached) {
                     try { await cache.add(song.url); updated = true; } catch(e) { }
                 }
@@ -557,6 +576,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentGenreFilter = null;
 
     window.viewArtist = (artistName) => {
+        currentPage = 1; // Reset pagination
         currentArtistFilter = artistName; currentGenreFilter = null; 
         document.getElementById('crjb-filter-text').innerText = 'Showing tracks by: ' + artistName;
         document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
@@ -564,6 +584,7 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     
     window.viewGenre = (genreName) => {
+        currentPage = 1; // Reset pagination
         currentGenreFilter = genreName; currentArtistFilter = null; 
         document.getElementById('crjb-filter-text').innerText = 'Showing genre: ' + genreName;
         document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
@@ -571,9 +592,15 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     window.clearArtistFilter = () => { 
+        currentPage = 1; // Reset pagination
         currentArtistFilter = null; currentGenreFilter = null; 
         document.getElementById('crjb-artist-filter-header').style.display = 'none'; 
         renderCat(); 
+    };
+
+    document.getElementById('crjb-catalog-sort').onchange = () => {
+        currentPage = 1; // Reset pagination
+        renderCat();
     };
 
     function loadCat() { 
@@ -594,105 +621,164 @@ document.addEventListener("DOMContentLoaded", function() {
         }); 
     }
 
+    // New Pagination Renderer
+    function renderPagination(totalPages, current) {
+        let pagContainer = document.getElementById('crjb-pagination-container');
+        if (!pagContainer) {
+            pagContainer = document.createElement('div');
+            pagContainer.id = 'crjb-pagination-container';
+            pagContainer.style.display = 'flex';
+            pagContainer.style.justifyContent = 'space-between';
+            pagContainer.style.alignItems = 'center';
+            pagContainer.style.marginTop = '15px';
+            pagContainer.style.padding = '10px 0';
+            document.getElementById('crjb-catalog-container').appendChild(pagContainer);
+        }
+
+        if (totalPages <= 1) {
+            pagContainer.innerHTML = '';
+            return;
+        }
+
+        let prevDisabled = current === 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+        let nextDisabled = current === totalPages ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+
+        pagContainer.innerHTML = `
+            <button class="crjb-btn" style="padding: 8px 16px; font-size: 13px; margin:0;" ${prevDisabled} onclick="window.crjbChangePage(${current - 1})">&laquo; Prev</button>
+            <span style="font-size: 13px; font-weight: 700; color: var(--crjb-sec);">Page ${current} of ${totalPages}</span>
+            <button class="crjb-btn" style="padding: 8px 16px; font-size: 13px; margin:0;" ${nextDisabled} onclick="window.crjbChangePage(${current + 1})">Next &raquo;</button>
+        `;
+    }
+
+    window.crjbChangePage = (newPage) => {
+        currentPage = newPage;
+        renderCat();
+        document.getElementById('crjb-catalog-container').scrollIntoView({behavior: 'smooth', block: 'start'});
+    };
+
     function renderCat() {
-        const l = document.getElementById('crjb-catalog-list'), s = document.getElementById('crjb-catalog-sort').value;
+        const l = document.getElementById('crjb-catalog-list');
+        const s = document.getElementById('crjb-catalog-sort').value;
         const showAvailable = availableOnlyCheckbox.checked;
 
-        let sorted = [...catData];
-        if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
-        if (currentGenreFilter) sorted = sorted.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
-        
-        if (showAvailable) {
-            sorted = sorted.filter(song => song.cooldown <= 0 && !song.is_playing && !song.is_locked_by_schedule);
-        }
-        
-        if(s === 'title') sorted.sort((a,b) => a.title.localeCompare(b.title)); else if(s === 'artist') sorted.sort((a,b) => a.artist.localeCompare(b.artist)); else if(s === 'newest') sorted.sort((a,b) => b.id - a.id);
-        
-        if(sorted.length === 0) { 
-            let emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found.</li>';
-            
-            if (catData.length > 0) {
-                let targetData = [...catData];
-                if (currentArtistFilter) targetData = targetData.filter(song => song.artist === currentArtistFilter);
-                if (currentGenreFilter) targetData = targetData.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
-                
-                if (targetData.length > 0) {
-                    let nextUnlockTs = Infinity;
-                    let nextUnlockMsg = "";
-                    
-                    targetData.forEach(s => {
-                        if (s.cooldown > 0 && !s.is_locked_by_schedule) {
-                            let cdTs = Date.now() + (s.cooldown * 1000);
-                            if (cdTs < nextUnlockTs) {
-                                nextUnlockTs = cdTs;
-                                nextUnlockMsg = "Next track available at " + new Date(cdTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                            }
-                        } else if (s.is_locked_by_schedule && s.unlock_timestamp) {
-                            let evTs = s.unlock_timestamp * 1000;
-                            if (evTs < nextUnlockTs) {
-                                nextUnlockTs = evTs;
-                                nextUnlockMsg = escapeHTML(s.unlock_msg); 
-                            }
-                        }
-                    });
+        // Yield DOM to prevent mobile thread locking
+        l.innerHTML = '<li style="text-align:center; padding:30px; font-weight:700; color:var(--crjb-sec);"><div class="crjb-spin" style="display:inline-block; margin-right:10px; color:var(--crjb-accent);">' + svgs.spinner + '</div> Organizing catalog...</li>';
 
-                    if (window.currentNpData && typeof offlineQueue !== 'undefined' && offlineQueue.length === 0) {
-                        let autoDjCanPlay = catData.some(s => s.cooldown <= 0 && !s.is_locked_by_schedule && s.id != window.currentNpData.id);
-                        if (!autoDjCanPlay) {
-                            let serverEndTime = window.currentNpData.start_timestamp + window.currentNpData.duration;
-                            let localOffset = Date.now() - (window.currentNpData.server_now * 1000);
-                            let localEndsAt = (serverEndTime * 1000) + localOffset;
-                            
-                            if (localEndsAt < nextUnlockTs && localEndsAt > Date.now()) {
-                                nextUnlockTs = localEndsAt;
-                                nextUnlockMsg = "Available when current song ends";
-                            }
-                        }
-                    }
-                    
-                    if (nextUnlockTs !== Infinity) {
-                        emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--crjb-sec); background:var(--crjb-panel); border:1px dashed var(--crjb-border); border-radius:12px; grid-column: 1 / -1;">' +
-                            '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--crjb-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
-                            '<strong style="font-size:15px; color:var(--crjb-text);">No tracks currently available</strong><br>' +
-                            '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--crjb-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
-                        '</li>';
-                    } else {
-                        emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
-                    }
-                } else if (currentArtistFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
-                } else if (currentGenreFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>'; }
+        setTimeout(() => {
+            let sorted = [...catData];
+            if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
+            if (currentGenreFilter) sorted = sorted.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
+            
+            if (showAvailable) {
+                sorted = sorted.filter(song => song.cooldown <= 0 && !song.is_playing && !song.is_locked_by_schedule);
             }
             
-            l.innerHTML = emptyMsg; 
-            return; 
-        }
-        
-        l.innerHTML = '';
-        let votedIds = getVotedSongs();
-
-        sorted.forEach(s => {
-            let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
-            let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
-            let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
+            if(s === 'title') sorted.sort((a,b) => a.title.localeCompare(b.title)); 
+            else if(s === 'artist') sorted.sort((a,b) => a.artist.localeCompare(b.artist)); 
+            else if(s === 'newest') sorted.sort((a,b) => b.id - a.id);
             
-            if (s.is_locked_by_schedule) { badge = '<div class="crjb-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
-            else if (s.is_playing) { badge = '<div class="crjb-cooldown-badge" style="background:var(--crjb-accent); color:#fff;">ON AIR</div>'; } 
-            else if (s.cooldown > 0) { badge = '<div class="crjb-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
+            if(sorted.length === 0) { 
+                let emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found.</li>';
+                
+                if (catData.length > 0) {
+                    let targetData = [...catData];
+                    if (currentArtistFilter) targetData = targetData.filter(song => song.artist === currentArtistFilter);
+                    if (currentGenreFilter) targetData = targetData.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
+                    
+                    if (targetData.length > 0) {
+                        let nextUnlockTs = Infinity;
+                        let nextUnlockMsg = "";
+                        
+                        targetData.forEach(s => {
+                            if (s.cooldown > 0 && !s.is_locked_by_schedule) {
+                                let cdTs = Date.now() + (s.cooldown * 1000);
+                                if (cdTs < nextUnlockTs) {
+                                    nextUnlockTs = cdTs;
+                                    nextUnlockMsg = "Next track available at " + new Date(cdTs).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                                }
+                            } else if (s.is_locked_by_schedule && s.unlock_timestamp) {
+                                let evTs = s.unlock_timestamp * 1000;
+                                if (evTs < nextUnlockTs) {
+                                    nextUnlockTs = evTs;
+                                    nextUnlockMsg = escapeHTML(s.unlock_msg); 
+                                }
+                            }
+                        });
+
+                        if (window.currentNpData && typeof offlineQueue !== 'undefined' && offlineQueue.length === 0) {
+                            let autoDjCanPlay = catData.some(s => s.cooldown <= 0 && !s.is_locked_by_schedule && s.id != window.currentNpData.id);
+                            if (!autoDjCanPlay) {
+                                let serverEndTime = window.currentNpData.start_timestamp + window.currentNpData.duration;
+                                let localOffset = Date.now() - (window.currentNpData.server_now * 1000);
+                                let localEndsAt = (serverEndTime * 1000) + localOffset;
+                                
+                                if (localEndsAt < nextUnlockTs && localEndsAt > Date.now()) {
+                                    nextUnlockTs = localEndsAt;
+                                    nextUnlockMsg = "Available when current song ends";
+                                }
+                            }
+                        }
+                        
+                        if (nextUnlockTs !== Infinity) {
+                            emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--crjb-sec); background:var(--crjb-panel); border:1px dashed var(--crjb-border); border-radius:12px; grid-column: 1 / -1;">' +
+                                '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--crjb-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
+                                '<strong style="font-size:15px; color:var(--crjb-text);">No tracks currently available</strong><br>' +
+                                '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--crjb-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
+                            '</li>';
+                        } else {
+                            emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
+                        }
+                    } else if (currentArtistFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
+                    } else if (currentGenreFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>'; }
+                }
+                
+                l.innerHTML = emptyMsg; 
+                renderPagination(0, 1);
+                return; 
+            }
             
-            let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
-            let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--crjb-sec); padding:10px 14px;">' + svgs.file + '</a>';
+            // --- Pagination Logic ---
+            const totalPages = Math.ceil(sorted.length / itemsPerPage);
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedItems = sorted.slice(startIndex, startIndex + itemsPerPage);
+
+            // --- In-Memory String Building (O(1) DOM Insertion) ---
+            let htmlString = '';
+            let votedIds = getVotedSongs();
+
+            paginatedItems.forEach(s => {
+                let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
+                let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
+                let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
+                
+                if (s.is_locked_by_schedule) { badge = '<div class="crjb-cooldown-badge" style="background:#8e44ad; color:#fff; border:1px solid #732d91;">' + svgs.lock + ' ' + escapeHTML(s.unlock_msg) + '</div>'; } 
+                else if (s.is_playing) { badge = '<div class="crjb-cooldown-badge" style="background:var(--crjb-accent); color:#fff;">ON AIR</div>'; } 
+                else if (s.cooldown > 0) { badge = '<div class="crjb-cooldown-badge">' + svgs.clock + ' Avail ' + new Date(Date.now() + s.cooldown * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</div>'; }
+                
+                let cIcon = (s.url && cachedUrls.has(s.url)) ? svgs.checkCircle : '';
+                let lyricsBtn = '<a href="' + sLink + '" target="_blank" class="crjb-btn" title="View Track Details" style="background:var(--crjb-sec); padding:10px 14px;">' + svgs.file + '</a>';
+                
+                let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
+
+                let genresArray = s.genre ? s.genre.split(', ') : [];
+                let gBadge = genresArray.length > 0 ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="crjb-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>' : '';
+
+                let voteBtnHtml = votedIds.includes(s.id)
+                    ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + '</button>'
+                    : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
+
+                htmlString += '<li class="crjb-track-item ' + (isLocked ? 'crjb-locked' : '') + '"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
+            });
+
+            // Insert exactly once
+            l.innerHTML = htmlString;
             
-            let safeVoteTitle = sTitle.replace(/'/g, "\\'"); let safeArtistQuote = sArtist.replace(/'/g, "\\'"); let safePreviewUrl = escapeHTML(s.preview_url);
-
-            let genresArray = s.genre ? s.genre.split(', ') : [];
-            let gBadge = genresArray.length > 0 ? '<div style="margin-top: 6px;">' + genresArray.map(g => '<span class="crjb-genre-badge" style="margin-left: 0; margin-right: 6px; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.8" onmouseout="this.style.opacity=1" onclick="viewGenre(\'' + escapeHTML(g).replace(/'/g, "\\'") + '\')">' + escapeHTML(g) + '</span>').join('') + '</div>' : '';
-
-            let voteBtnHtml = votedIds.includes(s.id)
-                ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + '</button>'
-                : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
-
-            l.innerHTML += '<li class="crjb-track-item ' + (isLocked ? 'crjb-locked' : '') + '"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
-        });
+            // Render pagination controls
+            renderPagination(totalPages, currentPage);
+        }, 50); // Yield to main thread
     }
     
     function stopPreview() {
@@ -764,6 +850,11 @@ document.addEventListener("DOMContentLoaded", function() {
         }).catch(e => showNotification('Cannot vote offline.', 'warning')); 
     };
     
-    poll(); loadCat(); setInterval(loadCat, 60000); setInterval(poll, 5000);
-    document.getElementById('crjb-catalog-sort').onchange = renderCat;
+    // Stagger Boot Sequence: Poll instant state immediately, fetch massive catalog 1s later.
+    poll(); 
+    setTimeout(loadCat, 1000); 
+    
+    // Relaxed polling intervals to save mobile battery and network
+    setInterval(loadCat, 120000); 
+    setInterval(poll, 8000); 
 });
