@@ -416,13 +416,22 @@ function crjb_import_scan_page() {
 // GEMINI API HANDLERS
 // ------------------------------------------
 
-add_filter( 'http_request_timeout', 'crjb_extend_gemini_timeout', 99, 2 );
-function crjb_extend_gemini_timeout( $timeout, $url ) {
-    // Grant Gemini 120 seconds to process heavy multimodal audio payloads
+// 1. Force the WordPress HTTP API Arguments
+add_filter( 'http_request_args', 'crjb_force_gemini_http_args', 99, 2 );
+function crjb_force_gemini_http_args( $args, $url ) {
     if ( strpos( $url, 'generativelanguage.googleapis.com' ) !== false ) {
-        return 120; 
+        $args['timeout'] = 150;
     }
-    return $timeout;
+    return $args;
+}
+
+// 2. Force the underlying cURL Transport Handle (Bypasses WP restrictions)
+add_action( 'http_api_curl', 'crjb_force_curl_timeout', 99, 3 );
+function crjb_force_curl_timeout( $handle, $args, $url ) {
+    if ( strpos( $url, 'generativelanguage.googleapis.com' ) !== false ) {
+        curl_setopt( $handle, CURLOPT_TIMEOUT, 150 );
+        curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, 150 );
+    }
 }
 
 function crjb_generate_radio_host_drop($post_id, $banner_text) {
@@ -586,6 +595,9 @@ function crjb_gemini_scan_handler() {
     if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
     if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
     
+    // Prevent the PHP process from dying while waiting for the AI audio transcription
+    set_time_limit(150); 
+    
     $song_id = isset($_POST['song_id']) ? intval($_POST['song_id']) : 0;
     if (!$song_id) wp_send_json_error('Invalid song ID.');
 
@@ -599,6 +611,9 @@ add_action('wp_ajax_crjb_gemini_bulk_scan', 'crjb_gemini_bulk_scan_handler');
 function crjb_gemini_bulk_scan_handler() {
     if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
     if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+    
+    // Prevent the PHP process from dying while waiting for the AI audio transcription (batch process)
+    set_time_limit(300);
     
     $all_songs = get_posts([
         'post_type'      => 'crjb_song',
