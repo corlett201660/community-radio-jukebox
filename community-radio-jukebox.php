@@ -75,6 +75,7 @@ function crjb_register_cpts_and_taxonomies() {
 add_action('admin_menu', 'crjb_add_admin_menu');
 function crjb_add_admin_menu() {
     add_submenu_page('edit.php?post_type=crjb_song', 'Jukebox Settings', 'Settings', 'manage_options', 'crjb_settings', 'crjb_settings_page');
+    add_submenu_page('edit.php?post_type=crjb_song', 'Import & Scan', 'Import & Scan', 'manage_options', 'crjb_import_scan', 'crjb_import_scan_page');
     add_submenu_page('edit.php?post_type=crjb_song', 'Jukebox Tutorial', 'Tutorial & Setup', 'manage_options', 'crjb_tutorial', 'crjb_tutorial_page');
 }
 
@@ -91,7 +92,6 @@ function crjb_register_settings() {
 }
 
 function crjb_settings_page() {
-    $gemini_nonce = wp_create_nonce('crjb_gemini_scan_action');
     ?>
     <div class="wrap">
         <h1>Jukebox Settings</h1>
@@ -200,6 +200,17 @@ function crjb_settings_page() {
                 </td>
             </tr>
         </table>
+    </div>
+    <?php
+}
+
+function crjb_import_scan_page() {
+    $gemini_nonce = wp_create_nonce('crjb_gemini_scan_action');
+    $folder_nonce = wp_create_nonce('crjb_folder_upload_nonce');
+    ?>
+    <div class="wrap">
+        <h1>Import & Scan Tools</h1>
+        <p class="description">Use these tools to populate your catalog and automate metadata generation.</p>
 
         <hr style="margin: 30px 0;">
         <h2>Gemini AI Bulk Catalog Scanner</h2>
@@ -212,7 +223,7 @@ function crjb_settings_page() {
                         <button type="button" id="crjb_clear_ai_data_btn" class="button button-secondary" style="color: #d63638; border-color: #d63638;">Wipe All AI Data</button>
                     </div>
                     <span id="crjb_bulk_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
-                    <p class="description"><strong>Scan Incomplete Library:</strong> Processes 1 song missing standard layout vectors via the WP AI Client to prevent server timeouts.<br>
+                    <p class="description"><strong>Scan Incomplete Library:</strong> Processes up to 10 songs missing standard layout vectors via the WP AI Client to prevent server timeouts.<br>
                     <strong>Wipe All AI Data:</strong> Instantly deletes all AI generated Genres and Lyrics from every track in your catalog so you can start a fresh rescan.</p>
                 </td>
             </tr>
@@ -226,7 +237,26 @@ function crjb_settings_page() {
                 <td>
                     <button type="button" id="crjb_import_mp3s_btn" class="button button-primary">Scan & Import MP3s</button>
                     <span id="crjb_import_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
-                    <p class="description">Scans the WordPress Media Library for MP3s that haven't been added to the Jukebox yet. Creates a new Song entry for each, using the filename as the track title.</p>
+                    <p class="description">Scans the WordPress Media Library for MP3s that haven't been added to the Jukebox yet. Creates a new Draft Song entry for each, using the filename as the track title.</p>
+                </td>
+            </tr>
+        </table>
+
+        <hr style="margin: 30px 0;">
+        <h2>Bulk Folder Import</h2>
+        <table class="form-table">
+            <tr>
+                <th scope="row">Import Artist Folders</th>
+                <td>
+                    <input type="file" id="crjb_folder_upload" webkitdirectory directory multiple accept="audio/mpeg" class="button" />
+                    <p class="description">Select a folder. The folder name will be used as the Artist, and the MP3 filename (minus the extension) will be the Song Title. Tracks will be imported as Drafts.</p>
+                    
+                    <div id="crjb_upload_progress_container" style="display:none; margin-top: 15px; max-width: 400px;">
+                        <div style="background: #e0e0e0; border-radius: 4px; overflow: hidden; width: 100%; height: 20px;">
+                            <div id="crjb_upload_progress_bar" style="background: #0073aa; width: 0%; height: 100%; transition: width 0.3s;"></div>
+                        </div>
+                        <p id="crjb_upload_status" style="margin-top: 8px; font-weight: 600;"></p>
+                    </div>
                 </td>
             </tr>
         </table>
@@ -258,7 +288,7 @@ function crjb_settings_page() {
 
         $('#crjb_bulk_scan_btn').click(function(e) {
             e.preventDefault();
-            if(!confirm('This will scan 1 incomplete audio file via the Gemini API. This may take up to a minute. Proceed?')) return;
+            if(!confirm('This will scan a batch of up to 10 incomplete audio files via the Gemini API. This may take a minute. Proceed?')) return;
             
             let btn = $(this);
             let wipeBtn = $('#crjb_clear_ai_data_btn');
@@ -310,6 +340,72 @@ function crjb_settings_page() {
                 btn.prop('disabled', false);
                 scanBtn.prop('disabled', false);
             });
+        });
+
+        $('#crjb_folder_upload').on('change', function(e) {
+            const files = e.target.files;
+            if (files.length === 0) return;
+
+            if (!confirm(`Ready to import ${files.length} audio files? Ensure your browser window stays open during the process.`)) {
+                $(this).val('');
+                return;
+            }
+
+            $('#crjb_upload_progress_container').show();
+            let currentIndex = 0;
+            const totalFiles = files.length;
+
+            function uploadNextFile() {
+                if (currentIndex >= totalFiles) {
+                    $('#crjb_upload_status').text('Import Complete!').css('color', '#28a745');
+                    $('#crjb_folder_upload').val('');
+                    return;
+                }
+
+                const file = files[currentIndex];
+                
+                // Parse webkitRelativePath (e.g., "The Beatles/Hey Jude.mp3")
+                const pathParts = file.webkitRelativePath.split('/');
+                let artistName = "Unknown Artist";
+                let fileName = file.name;
+
+                if (pathParts.length >= 2) {
+                    artistName = pathParts[pathParts.length - 2]; 
+                }
+                
+                // Strip .mp3 extension for the title
+                let songTitle = fileName.replace(/\.[^/.]+$/, "");
+
+                $('#crjb_upload_status').text(`Uploading: ${songTitle} by ${artistName} (${currentIndex + 1}/${totalFiles})`).css('color', '#000');
+
+                let formData = new FormData();
+                formData.append('action', 'crjb_process_folder_upload');
+                formData.append('security', '<?php echo esc_js($folder_nonce); ?>');
+                formData.append('artist', artistName);
+                formData.append('title', songTitle);
+                formData.append('file', file);
+
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(res) {
+                        let percent = Math.round(((currentIndex + 1) / totalFiles) * 100);
+                        $('#crjb_upload_progress_bar').css('width', percent + '%');
+                        currentIndex++;
+                        uploadNextFile(); 
+                    },
+                    error: function() {
+                        $('#crjb_upload_status').text(`Error uploading ${songTitle}. Skipping...`).css('color', '#d63638');
+                        currentIndex++;
+                        uploadNextFile(); 
+                    }
+                });
+            }
+
+            uploadNextFile(); 
         });
     });
     </script>
@@ -468,7 +564,7 @@ function crjb_gemini_clear_all_handler() {
     
     $all_songs = get_posts([
         'post_type'      => 'crjb_song',
-        'post_status'    => ['publish', 'draft'],
+        'post_status'    => 'any',
         'posts_per_page' => -1,
         'fields'         => 'ids'
     ]);
@@ -506,7 +602,7 @@ function crjb_gemini_bulk_scan_handler() {
     
     $all_songs = get_posts([
         'post_type'      => 'crjb_song',
-        'post_status'    => ['publish', 'draft'],
+        'post_status'    => 'any', // Specifically adjusted to process drafts, pending, etc.
         'posts_per_page' => -1,
         'fields'         => 'ids'
     ]);
@@ -518,7 +614,7 @@ function crjb_gemini_bulk_scan_handler() {
         
         if (empty($genres) || is_wp_error($genres) || empty($lyrics) || strpos($lyrics, 'No audio file provided') !== false || strpos($lyrics, 'Audio file too large') !== false) {
             $incomplete_songs[] = $song_id;
-            if (count($incomplete_songs) >= 1) break;
+            if (count($incomplete_songs) >= 10) break;
         }
     }
 
@@ -603,8 +699,7 @@ function crjb_execute_gemini_scan($song_id) {
     $data = json_decode($result, true);
     
     if (!$data) {
-        $clean_result = trim(str_replace(['```json', '
-```'], '', $result));
+        $clean_result = trim(str_replace(['```json', '```'], '', $result));
         $data = json_decode($clean_result, true);
         if (!$data) return new WP_Error('parse_error', 'Failed to parse Gemini response.');
     }
@@ -628,6 +723,85 @@ function crjb_execute_gemini_scan($song_id) {
     
     update_option('crjb_catalog_version', time());
     return $response_data;
+}
+
+// ------------------------------------------
+// BULK FOLDER IMPORT HANDLER
+// ------------------------------------------
+add_action('wp_ajax_crjb_process_folder_upload', 'crjb_process_folder_upload_handler');
+function crjb_process_folder_upload_handler() {
+    // 1. Security & Permissions
+    check_ajax_referer('crjb_folder_upload_nonce', 'security');
+    if (!current_user_can('upload_files') || !current_user_can('edit_posts')) {
+        wp_send_json_error('Unauthorized.');
+    }
+
+    if (empty($_FILES['file'])) wp_send_json_error('No file received.');
+
+    $artist_name = sanitize_text_field(wp_unslash($_POST['artist']));
+    $song_title  = sanitize_text_field(wp_unslash($_POST['title']));
+
+    // 2. Upload the MP3 to the WP Media Library
+    require_once(ABSPATH . 'wp-admin/includes/file.php');
+    require_once(ABSPATH . 'wp-admin/includes/media.php');
+    require_once(ABSPATH . 'wp-admin/includes/image.php');
+
+    $uploaded_file = $_FILES['file'];
+    $upload_overrides = ['test_form' => false];
+    
+    $movefile = wp_handle_upload($uploaded_file, $upload_overrides);
+
+    if ($movefile && !isset($movefile['error'])) {
+        $filename = $movefile['file'];
+        $filetype = wp_check_filetype(basename($filename), null);
+        $wp_upload_dir = wp_upload_dir();
+
+        $attachment = [
+            'guid'           => $wp_upload_dir['url'] . '/' . basename($filename), 
+            'post_mime_type' => $filetype['type'],
+            'post_title'     => preg_replace('/\.[^.]+$/', '', basename($filename)),
+            'post_content'   => '',
+            'post_status'    => 'inherit'
+        ];
+
+        $attach_id = wp_insert_attachment($attachment, $filename);
+        $attach_data = wp_generate_attachment_metadata($attach_id, $filename);
+        wp_update_attachment_metadata($attach_id, $attach_data);
+
+        // Extract duration via WP audio metadata
+        $meta = wp_read_audio_metadata($filename);
+        $duration = !empty($meta['length']) ? ceil($meta['length']) : 180;
+
+        // 3. Create the Jukebox Song Post
+        $post_id = wp_insert_post([
+            'post_title'  => $song_title,
+            'post_type'   => 'crjb_song',
+            'post_status' => 'draft'
+        ]);
+
+        if ($post_id) {
+            // Attach the audio metadata
+            update_post_meta($post_id, 'crjb_audio_attachment_id', $attach_id);
+            update_post_meta($post_id, 'full_audio_url', esc_url_raw($movefile['url']));
+            update_post_meta($post_id, 'preview_url', esc_url_raw($movefile['url']));
+            update_post_meta($post_id, 'audio_duration', $duration);
+            
+            // Set base safety defaults
+            update_post_meta($post_id, 'crjb_is_explicit', '0');
+            update_post_meta($post_id, 'crjb_royalty_free', '0');
+            update_post_meta($post_id, 'crjb_always_available', '0');
+            
+            // Set the Artist Taxonomy (creates it if it doesn't exist)
+            wp_set_object_terms($post_id, $artist_name, 'crjb_artist', false);
+
+            update_option('crjb_catalog_version', time());
+            wp_send_json_success('Uploaded successfully.');
+        } else {
+            wp_send_json_error('Failed to create song post.');
+        }
+    } else {
+        wp_send_json_error($movefile['error']);
+    }
 }
 
 // Handler for CSV Export
