@@ -20,9 +20,13 @@ document.addEventListener("DOMContentLoaded", function() {
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
     localStorage.setItem('crjb_l_id', lId);
 
-    // --- Dynamic Pagination State (Window Width Based) ---
+    // --- Device Detection ---
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+
+    // --- Dynamic Pagination & Search State ---
     let currentPage = 1;
     let itemsPerPage = window.innerWidth < 768 ? 10 : 25;
+    let currentSearchQuery = '';
 
     // Listen for device rotations to adjust the layout size automatically
     window.addEventListener('resize', () => {
@@ -40,9 +44,27 @@ document.addEventListener("DOMContentLoaded", function() {
 
     availableOnlyCheckbox.addEventListener('change', (e) => {
         localStorage.setItem('crjb_available_only', e.target.checked);
-        currentPage = 1; // Reset to page 1 on filter change
+        currentPage = 1; 
         renderCat();
     });
+
+    // --- Inject Dynamic Search Bar ---
+    const catalogSort = document.getElementById('crjb-catalog-sort');
+    if (catalogSort && catalogSort.parentNode) {
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.id = 'crjb-search-input';
+        searchInput.placeholder = 'Search tracks...';
+        searchInput.style.cssText = 'padding:6px; border-radius:8px; font-size:12px; background:var(--crjb-panel); color:inherit; border:1px solid var(--crjb-border); margin-right: 5px; flex-grow: 1; min-width: 120px; outline: none;';
+        
+        catalogSort.parentNode.insertBefore(searchInput, catalogSort);
+
+        searchInput.addEventListener('input', (e) => {
+            currentSearchQuery = e.target.value.toLowerCase().trim();
+            currentPage = 1; // Reset pagination when typing
+            renderCat();
+        });
+    }
 
     const svgs = {
         moon: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
@@ -164,7 +186,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const ql = document.getElementById('crjb-queue-list'); 
         
         let htmlString = '';
-        // Slice the queue UI so massive queues don't break the page either
         queueArray.slice(0, 25).forEach(s => {
             let sTitle = escapeHTML(s.title);
             let sArtist = escapeHTML(s.artist);
@@ -572,34 +593,33 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    let currentArtistFilter = null;
-    let currentGenreFilter = null;
-
     window.viewArtist = (artistName) => {
-        currentPage = 1; // Reset pagination
-        currentArtistFilter = artistName; currentGenreFilter = null; 
+        currentPage = 1; 
+        currentArtistFilter = artistName; 
         document.getElementById('crjb-filter-text').innerText = 'Showing tracks by: ' + artistName;
-        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
+        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; 
+        renderCat();
         document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
     
     window.viewGenre = (genreName) => {
-        currentPage = 1; // Reset pagination
-        currentGenreFilter = genreName; currentArtistFilter = null; 
+        currentPage = 1; 
+        currentGenreFilter = genreName; 
         document.getElementById('crjb-filter-text').innerText = 'Showing genre: ' + genreName;
-        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
+        document.getElementById('crjb-artist-filter-header').style.display = 'flex'; 
+        renderCat();
         document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
 
     window.clearArtistFilter = () => { 
-        currentPage = 1; // Reset pagination
+        currentPage = 1; 
         currentArtistFilter = null; currentGenreFilter = null; 
         document.getElementById('crjb-artist-filter-header').style.display = 'none'; 
         renderCat(); 
     };
 
     document.getElementById('crjb-catalog-sort').onchange = () => {
-        currentPage = 1; // Reset pagination
+        currentPage = 1; 
         renderCat();
     };
 
@@ -609,14 +629,14 @@ document.addEventListener("DOMContentLoaded", function() {
                 catData = d.data.catalog; 
                 localStorage.setItem('crjb_offline_catalog_' + stationId, JSON.stringify(catData));
                 await refreshCacheSet();
-                renderCat(); 
+                renderCat(true); // Pass true to indicate it's a background refresh
             } 
         }).catch(async e => {
             const savedCat = localStorage.getItem('crjb_offline_catalog_' + stationId);
             if (savedCat) {
                 catData = JSON.parse(savedCat);
                 await refreshCacheSet();
-                renderCat();
+                renderCat(true);
             }
         }); 
     }
@@ -656,23 +676,42 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('crjb-catalog-container').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
 
-    function renderCat() {
+    function renderCat(isBackgroundRefresh = false) {
         const l = document.getElementById('crjb-catalog-list');
         const s = document.getElementById('crjb-catalog-sort').value;
         const showAvailable = availableOnlyCheckbox.checked;
 
-        // Yield DOM to prevent mobile thread locking
-        l.innerHTML = '<li style="text-align:center; padding:30px; font-weight:700; color:var(--crjb-sec);"><div class="crjb-spin" style="display:inline-block; margin-right:10px; color:var(--crjb-accent);">' + svgs.spinner + '</div> Organizing catalog...</li>';
+        // Fix DOM collapse: Only show the full spinner if the list is empty (initial load).
+        // Otherwise, just dim the list slightly so the user doesn't lose their scroll position.
+        if (l.children.length === 0) {
+            l.innerHTML = '<li style="text-align:center; padding:30px; font-weight:700; color:var(--crjb-sec);"><div class="crjb-spin" style="display:inline-block; margin-right:10px; color:var(--crjb-accent);">' + svgs.spinner + '</div> Organizing catalog...</li>';
+        } else if (!isBackgroundRefresh) {
+            l.style.opacity = '0.5';
+        }
 
         setTimeout(() => {
             let sorted = [...catData];
+            
+            // 1. Apply Click Filters (Artist/Genre Buttons)
             if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
             if (currentGenreFilter) sorted = sorted.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
             
+            // 2. Apply Text Search Filter
+            if (currentSearchQuery) {
+                sorted = sorted.filter(song => {
+                    const titleMatch = song.title.toLowerCase().includes(currentSearchQuery);
+                    const artistMatch = song.artist.toLowerCase().includes(currentSearchQuery);
+                    const genreMatch = song.genre && song.genre.toLowerCase().includes(currentSearchQuery);
+                    return titleMatch || artistMatch || genreMatch;
+                });
+            }
+
+            // 3. Apply Availability Filter
             if (showAvailable) {
                 sorted = sorted.filter(song => song.cooldown <= 0 && !song.is_playing && !song.is_locked_by_schedule);
             }
             
+            // 4. Apply Sorting
             if(s === 'title') sorted.sort((a,b) => a.title.localeCompare(b.title)); 
             else if(s === 'artist') sorted.sort((a,b) => a.artist.localeCompare(b.artist)); 
             else if(s === 'newest') sorted.sort((a,b) => b.id - a.id);
@@ -719,20 +758,23 @@ document.addEventListener("DOMContentLoaded", function() {
                             }
                         }
                         
-                        if (nextUnlockTs !== Infinity) {
+                        if (nextUnlockTs !== Infinity && !currentSearchQuery) {
                             emptyMsg = '<li style="padding:30px 15px; text-align:center; color:var(--crjb-sec); background:var(--crjb-panel); border:1px dashed var(--crjb-border); border-radius:12px; grid-column: 1 / -1;">' +
                                 '<svg width="2em" height="2em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px; color:var(--crjb-accent);"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg><br>' +
                                 '<strong style="font-size:15px; color:var(--crjb-text);">No tracks currently available</strong><br>' +
                                 '<span style="font-size:13px; font-weight:600; display:inline-block; margin-top:8px; background:rgba(0,115,170,0.1); color:var(--crjb-accent); padding:4px 12px; border-radius:12px;">' + nextUnlockMsg + '</span>' +
                             '</li>';
-                        } else {
+                        } else if (!currentSearchQuery) {
                             emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
+                        } else {
+                            emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks match your search.</li>';
                         }
                     } else if (currentArtistFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
                     } else if (currentGenreFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>'; }
                 }
                 
                 l.innerHTML = emptyMsg; 
+                l.style.opacity = '1';
                 renderPagination(0, 1);
                 return; 
             }
@@ -775,6 +817,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
             // Insert exactly once
             l.innerHTML = htmlString;
+            l.style.opacity = '1';
             
             // Render pagination controls
             renderPagination(totalPages, currentPage);
