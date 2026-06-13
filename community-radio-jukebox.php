@@ -27,6 +27,14 @@ class CRJB_Asset_Manager {
         wp_enqueue_media(); 
         wp_enqueue_style('crjb-select2-css', CRJB_PLUGIN_URL . 'assets/css/select2.min.css', [], '4.1.0');
         wp_enqueue_script('crjb-select2-js', CRJB_PLUGIN_URL . 'assets/js/select2.min.js', ['jquery'], '4.1.0', true);
+        
+        // Centralized admin scripts
+        wp_enqueue_script('crjb-admin-js', CRJB_PLUGIN_URL . 'assets/js/jukebox-admin.js', ['jquery', 'crjb-select2-js'], CRJB_VERSION, true);
+        wp_localize_script('crjb-admin-js', 'crjbAdminData', [
+            'ajaxurl' => admin_url('admin-ajax.php'),
+            'geminiNonce' => wp_create_nonce('crjb_gemini_scan_action'),
+            'folderNonce' => wp_create_nonce('crjb_folder_upload_nonce')
+        ]);
     }
 
     public function enqueue_frontend_assets() {
@@ -186,8 +194,6 @@ function crjb_settings_page() {
 }
 
 function crjb_import_scan_page() {
-    $gemini_nonce = wp_create_nonce('crjb_gemini_scan_action');
-    $folder_nonce = wp_create_nonce('crjb_folder_upload_nonce');
     ?>
     <div class="wrap">
         <h1>Import & Scan Tools</h1>
@@ -255,176 +261,6 @@ function crjb_import_scan_page() {
             </tr>
         </table>
     </div>
-
-    <script>
-    jQuery(document).ready(function($){
-        $('#crjb_import_mp3s_btn').click(function(e) {
-            e.preventDefault();
-            if(!confirm('Scan the media library and import unlinked MP3s as new songs?')) return;
-            
-            let btn = $(this);
-            let status = $('#crjb_import_status');
-            btn.prop('disabled', true);
-            status.css('color', '#000').text('Scanning media library...');
-
-            $.post(ajaxurl, { action: 'crjb_import_media_library', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
-                if(res.success) {
-                    status.css('color', '#28a745').text(res.data.msg);
-                } else {
-                    status.css('color', '#d63638').text('Error: ' + res.data);
-                }
-                btn.prop('disabled', false);
-            }).fail(function() {
-                status.css('color', '#d63638').text('Server timeout or error. Check PHP error logs.');
-                btn.prop('disabled', false);
-            });
-        });
-
-        $('#crjb_bulk_scan_btn').click(function(e) {
-            e.preventDefault();
-            if(!confirm('This will scan a batch of up to 10 incomplete audio files via the Gemini API. This may take a minute. Proceed?')) return;
-            
-            let btn = $(this);
-            let wipeBtn = $('#crjb_clear_ai_data_btn');
-            let status = $('#crjb_bulk_status');
-            btn.prop('disabled', true);
-            wipeBtn.prop('disabled', true);
-            status.css('color', '#000').text('Fetching incomplete songs and sending to Gemini...');
-
-            $.post(ajaxurl, { action: 'crjb_gemini_bulk_scan', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
-                if(res.success) {
-                    if(res.data.processed === 0) {
-                        status.css('color', '#28a745').text(res.data.msg);
-                    } else {
-                        status.css('color', '#28a745').text('Success! Scanned ' + res.data.processed + ' tracks. Click again to scan the next batch.');
-                    }
-                } else {
-                    status.css('color', '#d63638').text('Error: ' + res.data);
-                }
-                btn.prop('disabled', false);
-                wipeBtn.prop('disabled', false);
-            }).fail(function() {
-                status.css('color', '#d63638').text('Server timeout or error. Check PHP error logs.');
-                btn.prop('disabled', false);
-                wipeBtn.prop('disabled', false);
-            });
-        });
-
-        $('#crjb_clear_ai_data_btn').click(function(e) {
-            e.preventDefault();
-            if(!confirm('WARNING: This will permanently delete ALL genres and lyrics from EVERY song in your library. You will need to rescan them afterwards. Are you sure?')) return;
-            
-            let btn = $(this);
-            let scanBtn = $('#crjb_bulk_scan_btn');
-            let status = $('#crjb_bulk_status');
-            btn.prop('disabled', true);
-            scanBtn.prop('disabled', true);
-            status.css('color', '#d63638').text('Wiping all AI data...');
-
-            $.post(ajaxurl, { action: 'crjb_gemini_clear_all', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
-                if(res.success) {
-                    status.css('color', '#28a745').text(res.data.msg);
-                } else {
-                    status.css('color', '#d63638').text('Error: ' + res.data);
-                }
-                btn.prop('disabled', false);
-                scanBtn.prop('disabled', false);
-            }).fail(function() {
-                status.css('color', '#d63638').text('Server timeout or error.');
-                btn.prop('disabled', false);
-                scanBtn.prop('disabled', false);
-            });
-        });
-
-        $('#crjb_cleanup_audio_btn').click(function(e) {
-            e.preventDefault();
-            if(!confirm('WARNING: This will permanently delete any MP3 from your WordPress Media Library that is not linked to the Jukebox. Proceed?')) return;
-            
-            let btn = $(this);
-            let status = $('#crjb_cleanup_status');
-            btn.prop('disabled', true);
-            status.css('color', '#000').text('Scanning and cleaning up storage...');
-
-            $.post(ajaxurl, { action: 'crjb_cleanup_orphaned_audio', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
-                if(res.success) {
-                    status.css('color', '#28a745').text(res.data.msg);
-                } else {
-                    status.css('color', '#d63638').text('Error: ' + res.data);
-                }
-                btn.prop('disabled', false);
-            }).fail(function() {
-                status.css('color', '#d63638').text('Server timeout or error. Check PHP error logs.');
-                btn.prop('disabled', false);
-            });
-        });
-
-        $('#crjb_folder_upload').on('change', function(e) {
-            const files = e.target.files;
-            if (files.length === 0) return;
-
-            if (!confirm(`Ready to import ${files.length} audio files? Ensure your browser window stays open during the process.`)) {
-                $(this).val('');
-                return;
-            }
-
-            $('#crjb_upload_progress_container').show();
-            let currentIndex = 0;
-            const totalFiles = files.length;
-
-            function uploadNextFile() {
-                if (currentIndex >= totalFiles) {
-                    $('#crjb_upload_status').text('Import Complete!').css('color', '#28a745');
-                    $('#crjb_folder_upload').val('');
-                    return;
-                }
-
-                const file = files[currentIndex];
-                
-                // Parse webkitRelativePath (e.g., "The Beatles/Hey Jude.mp3")
-                const pathParts = file.webkitRelativePath.split('/');
-                let artistName = "Unknown Artist";
-                let fileName = file.name;
-
-                if (pathParts.length >= 2) {
-                    artistName = pathParts[pathParts.length - 2]; 
-                }
-                
-                // Strip .mp3 extension for the title
-                let songTitle = fileName.replace(/\.[^/.]+$/, "");
-
-                $('#crjb_upload_status').text(`Uploading: ${songTitle} by ${artistName} (${currentIndex + 1}/${totalFiles})`).css('color', '#000');
-
-                let formData = new FormData();
-                formData.append('action', 'crjb_process_folder_upload');
-                formData.append('security', '<?php echo esc_js($folder_nonce); ?>');
-                formData.append('artist', artistName);
-                formData.append('title', songTitle);
-                formData.append('file', file);
-
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: formData,
-                    processData: false,
-                    contentType: false,
-                    success: function(res) {
-                        let percent = Math.round(((currentIndex + 1) / totalFiles) * 100);
-                        $('#crjb_upload_progress_bar').css('width', percent + '%');
-                        currentIndex++;
-                        uploadNextFile(); 
-                    },
-                    error: function() {
-                        $('#crjb_upload_status').text(`Error uploading ${songTitle}. Skipping...`).css('color', '#d63638');
-                        currentIndex++;
-                        uploadNextFile(); 
-                    }
-                });
-            }
-
-            uploadNextFile(); 
-        });
-    });
-    </script>
     <?php
 }
 
@@ -523,7 +359,7 @@ function crjb_import_media_library_handler() {
     }
 
     if ($imported > 0) {
-        update_option('crjb_catalog_version', time());
+        update_option('crjb_catalog_version', time(), false);
     }
 
     wp_send_json_success(['msg' => "Success! Imported {$imported} new MP3s as Drafts. You can now review them and use the Bulk Scanner."]);
@@ -549,7 +385,7 @@ function crjb_gemini_clear_all_handler() {
         $cleared++;
     }
 
-    update_option('crjb_catalog_version', time());
+    update_option('crjb_catalog_version', time(), false);
     wp_send_json_success(['msg' => "Successfully wiped AI data for {$cleared} tracks. Your catalog is now a blank slate for rescanning."]);
 }
 
@@ -699,7 +535,7 @@ function crjb_execute_gemini_scan($song_id) {
         $response_data['explicit_status'] = $data['is_explicit'] ? 'Explicit' : 'Clean';
     }
     
-    update_option('crjb_catalog_version', time());
+    update_option('crjb_catalog_version', time(), false);
     return $response_data;
 }
 
@@ -772,7 +608,7 @@ function crjb_process_folder_upload_handler() {
             // Set the Artist Taxonomy (creates it if it doesn't exist)
             wp_set_object_terms($post_id, $artist_name, 'crjb_artist', false);
 
-            update_option('crjb_catalog_version', time());
+            update_option('crjb_catalog_version', time(), false);
             wp_send_json_success('Uploaded successfully.');
         } else {
             wp_send_json_error('Failed to create song post.');
@@ -878,7 +714,7 @@ function crjb_tutorial_page() {
         <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #fd7e14; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
             <h2 style="margin-top: 0;">7. Artist Submissions & Bulk Importing</h2>
             <p>Empower your local community to contribute their original music directly to your library! Enable Submissions in the settings, then place this shortcode on any page:</p>
-            <p><code style="font-size: 16px; padding: 5px 10px; background: #f0f0f1; border-radius: 4px;">[crjb_submit_mp3]</code></p>
+            <p><code style="font-size: 16px; padding: 5px 10px; background: #f0f0f1; border-radius: 4px;">[community_radio_jukebox_submit_mp3]</code></p>
             <p>Once artists upload their files, simply navigate to the <strong>Jukebox Settings</strong> page and click <strong>Scan & Import MP3s</strong>. The system will instantly turn them into Draft songs, ready for you to review, run the AI Scanner, and publish!</p>
         </div>
 
@@ -895,13 +731,38 @@ function crjb_tutorial_page() {
 // DEDICATED TRACK PAGE FRONTEND DISPLAY
 // ------------------------------------------
 
-add_action('wp_head', 'crjb_hide_sidebar_on_song_page');
+add_action('wp_enqueue_scripts', 'crjb_hide_sidebar_on_song_page');
 function crjb_hide_sidebar_on_song_page() {
     if (is_singular('crjb_song')) {
-        echo '<style>
+        wp_register_style('crjb-song-layout', false);
+        wp_enqueue_style('crjb-song-layout');
+        $custom_css = "
             #secondary, #sidebar, .sidebar, .widget-area, aside#secondary { display: none !important; }
             #primary, #content, .site-main, .content-area, .site-content { width: 100% !important; max-width: none !important; float: none !important; border: none !important; }
-        </style>';
+        ";
+        wp_add_inline_style('crjb-song-layout', $custom_css);
+    }
+}
+
+add_action('wp_enqueue_scripts', 'crjb_enqueue_song_preview_script');
+function crjb_enqueue_song_preview_script() {
+    if (is_singular('crjb_song')) {
+        wp_register_script('crjb-preview-script', false, [], false, true);
+        wp_enqueue_script('crjb-preview-script');
+        $custom_js = '
+            document.addEventListener("DOMContentLoaded", function() {
+                var audio = document.getElementById("crjb-dedicated-preview");
+                if(audio) {
+                    audio.addEventListener("timeupdate", function() {
+                        if(audio.currentTime >= 30) {
+                            audio.pause();
+                            audio.currentTime = 0;
+                        }
+                    });
+                }
+            });
+        ';
+        wp_add_inline_script('crjb-preview-script', $custom_js);
     }
 }
 
@@ -1009,7 +870,7 @@ function crjb_song_dedicated_page_content($content) {
         }
         
         $html .= '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; background: #f5f5f5; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0; margin-bottom: 30px;">';
-        $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Duration</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . $duration_fmt . '</span></div>';
+        $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Duration</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . esc_html($duration_fmt) . '</span></div>';
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Genres</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . esc_html($genres) . '</span></div>';
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Playlists</strong><span style="font-size: 16px; font-weight: 600; color: #333;">' . esc_html($playlists) . '</span></div>';
         $html .= '<div><strong style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 5px;">Featured In</strong><span style="font-size: 15px; font-weight: 700; color: #0073aa;">' . esc_html($events_str) . '</span></div>';
@@ -1024,19 +885,6 @@ function crjb_song_dedicated_page_content($content) {
             $html .= '<div style="background: #eef7fc; padding: 20px; border-radius: 12px; border: 1px solid #bce0f4; margin-bottom: 40px; text-align: center;">';
             $html .= '<h4 style="margin: 0 0 15px 0; color: #0073aa; font-weight: 800; font-size: 16px;">30-Second Preview</h4>';
             $html .= '<audio id="crjb-dedicated-preview" controls controlsList="nodownload" src="' . esc_url($preview_url) . '" style="width: 100%; max-width: 400px; outline: none; border-radius: 8px;"></audio>';
-            $html .= '<script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    var audio = document.getElementById("crjb-dedicated-preview");
-                    if(audio) {
-                        audio.addEventListener("timeupdate", function() {
-                            if(audio.currentTime >= 30) {
-                                audio.pause();
-                                audio.currentTime = 0;
-                            }
-                        });
-                    }
-                });
-            </script>';
             $html .= '</div>';
         }
         
@@ -1091,7 +939,6 @@ function crjb_add_song_meta_boxes() {
 
 function crjb_song_details_callback( $post ) {
     wp_nonce_field( 'crjb_save_song_data', 'crjb_song_meta_nonce' );
-    $gemini_nonce = wp_create_nonce('crjb_gemini_scan_action');
     $full_audio_url = get_post_meta( $post->ID, 'full_audio_url', true );
     $audio_attachment_id = get_post_meta( $post->ID, 'crjb_audio_attachment_id', true );
     $audio_duration = get_post_meta( $post->ID, 'audio_duration', true );
@@ -1171,6 +1018,7 @@ function crjb_song_details_callback( $post ) {
             <div style="display: flex; gap: 10px;">
                 <input type="url" id="full_audio_url" name="full_audio_url" value="<?php echo esc_attr($full_audio_url); ?>" style="flex-grow: 1;" readonly />
                 <input type="hidden" id="crjb_audio_attachment_id" name="crjb_audio_attachment_id" value="<?php echo esc_attr($audio_attachment_id); ?>" />
+                <input type="hidden" id="crjb_saved_audio_url" value="<?php echo esc_attr($full_audio_url); ?>" />
                 <button type="button" class="button button-secondary" id="crjb_upload_mp3_btn">Select Track MP3</button>
                 <button type="button" class="button button-primary" id="crjb_gemini_scan_btn">✨ Analyze Audio</button>
             </div>
@@ -1202,80 +1050,6 @@ function crjb_song_details_callback( $post ) {
             </td>
         </tr>
     </table>
-    <script>
-    jQuery(document).ready(function($){
-        var uploader;
-        $('#crjb_upload_mp3_btn').click(function(e) {
-            e.preventDefault();
-            if (uploader) { uploader.open(); return; }
-            uploader = wp.media({ title: 'Choose Network MP3', button: { text: 'Select Audio' }, multiple: false, library: { type: 'audio' } });
-            uploader.on('select', function() {
-                var attachment = uploader.state().get('selection').first().toJSON();
-                $('#crjb_audio_attachment_id').val(attachment.id);
-                $('#full_audio_url').val(attachment.url);
-                if($('#preview_url').val() === '') $('#preview_url').val(attachment.url);
-            });
-            uploader.open();
-        });
-
-        $('.crjb_upload_memo_btn').click(function(e) {
-            e.preventDefault();
-            var target = $(this).data('target');
-            var memoUploader = wp.media({ title: 'Choose Voice Memo', button: { text: 'Select Audio' }, multiple: false, library: { type: 'audio' } });
-            memoUploader.on('select', function() {
-                var attachment = memoUploader.state().get('selection').first().toJSON();
-                $('#crjb_' + target + '_attachment_id').val(attachment.id);
-                $('#' + target + '_audio_url').val(attachment.url);
-            });
-            memoUploader.open();
-        });
-
-        $('.crjb_clear_memo_btn').click(function(e) {
-            e.preventDefault();
-            var target = $(this).data('target');
-            $('#crjb_' + target + '_attachment_id').val('');
-            $('#' + target + '_audio_url').val('');
-        });
-
-        $('#crjb_gemini_scan_btn').click(function(e) {
-            e.preventDefault();
-            
-            let current_url = $('#full_audio_url').val();
-            let saved_url = "<?php echo esc_js($full_audio_url); ?>";
-            let isAutoDraft = $('#original_post_status').val() === 'auto-draft' || $('#post_status').val() === 'auto-draft';
-
-            if (current_url === '') {
-                alert('Please select a Track MP3 first.');
-                return;
-            }
-
-            if (current_url !== saved_url || isAutoDraft) {
-                alert('Please click "Publish" or "Update" first!\n\nThe MP3 needs to be saved to the database before the AI can securely analyze it.');
-                return;
-            }
-
-            let btn = $(this);
-            let id = $('#post_ID').val();
-            btn.text('Scanning Audio...').prop('disabled', true);
-            $.post(ajaxurl, { action: 'crjb_gemini_scan', song_id: id, security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
-                if(res.success) {
-                    let msg = "Success!";
-                    if(res.data.genres) msg += '\nGenres assigned: ' + res.data.genres.join(', ');
-                    if(res.data.explicit_status) msg += '\nRating status: ' + res.data.explicit_status;
-                    if(res.data.lyrics_status) msg += '\nLyrics status: ' + res.data.lyrics_status;
-                    alert(msg);
-                    location.reload(); 
-                } else {
-                    alert('Error: ' + res.data);
-                    btn.text('✨ Analyze Audio').prop('disabled', false);
-                }
-            }).fail(function() {
-                alert('Server timeout or error. The file may be too large.');
-                btn.text('✨ Analyze Audio').prop('disabled', false);
-            });
-        });
-    });
-    </script>
     <?php
 }
 
@@ -1331,18 +1105,6 @@ function crjb_schedule_details_callback( $post ) {
             <td><?php crjb_render_tax_select_field('crjb_artist', $artist, 'crjb_artist_arr', 'Select artists...'); ?></td>
         </tr>
     </table>
-    
-    <script>
-    jQuery(document).ready(function($){
-        if ($.fn.select2) {
-            $('.crjb-select2').select2({
-                tags: true,
-                tokenSeparators: [','],
-                allowClear: true
-            });
-        }
-    });
-    </script>
     <?php
 }
 
@@ -1358,7 +1120,7 @@ function crjb_save_custom_meta_data( $post_id ) {
             return;
         }
 
-        update_option('crjb_catalog_version', time());
+        update_option('crjb_catalog_version', time(), false);
         
         // phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce is verified at the top of the block.
         $always_available = isset($_POST['crjb_always_available']) ? 1 : 0;
@@ -1428,7 +1190,7 @@ function crjb_save_custom_meta_data( $post_id ) {
             return;
         }
 
-        update_option('crjb_catalog_version', time());
+        update_option('crjb_catalog_version', time(), false);
         
         // phpcs:disable WordPress.Security.NonceVerification.Missing -- Nonce is verified at the top of the block.
         $days = isset($_POST['crjb_days']) ? array_map('sanitize_text_field', wp_unslash($_POST['crjb_days'])) : [];
@@ -1459,7 +1221,7 @@ function crjb_save_custom_meta_data( $post_id ) {
 }
 
 add_action('trashed_post', function($post_id) {
-    if(in_array(get_post_type($post_id), ['crjb_song', 'crjb_schedule'])) update_option('crjb_catalog_version', time());
+    if(in_array(get_post_type($post_id), ['crjb_song', 'crjb_schedule'])) update_option('crjb_catalog_version', time(), false);
 });
 
 // ==========================================
@@ -1722,13 +1484,13 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
             if (!in_array($month_key, $available_months)) {
                 $available_months[] = $month_key;
                 rsort($available_months); 
-                update_option('crjb_broadcast_log_months', $available_months, 'no');
+                update_option('crjb_broadcast_log_months', $available_months, false);
             }
 
-            update_option($month_log_option, array_values($broadcast_log), 'no');
+            update_option($month_log_option, array_values($broadcast_log), false);
 
             foreach($history as $id => $time) if($now - $time > 3600) unset($history[$id]); 
-            update_option("crjb_play_history_{$station_id}", $history, 'no');
+            update_option("crjb_play_history_{$station_id}", $history, false);
         }
 
         $queue = get_transient("crjb_active_queue_{$station_id}") ?: [];
@@ -1762,7 +1524,7 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
                 'url' => get_post_meta($id, 'full_audio_url', true),
                 'listeners_at_start' => $active_listeners_count
             ];
-            update_option("crjb_now_playing_sync_{$station_id}", $current, 'no');
+            update_option("crjb_now_playing_sync_{$station_id}", $current, false);
         } else {
             $history_keys = !empty($history) ? array_keys($history) : [0];
             
@@ -1808,7 +1570,7 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
                 $last_id = $current ? $current['id'] : 0; 
                 $history = []; 
                 if ($last_id) $history[$last_id] = $now; 
-                update_option("crjb_play_history_{$station_id}", $history, 'no');
+                update_option("crjb_play_history_{$station_id}", $history, false);
                 
                 $query_args['post__not_in'] = [$last_id];
                 $fallback = $is_open_play ? crjb_get_open_play_fallback($query_args, $all_schedules) : get_posts($query_args);
@@ -1834,7 +1596,7 @@ function crjb_process_queue_and_get_current($station_id = 'global') {
                     'url' => get_post_meta($id, 'full_audio_url', true),
                     'listeners_at_start' => $active_listeners_count
                 ];
-                update_option("crjb_now_playing_sync_{$station_id}", $current, 'no');
+                update_option("crjb_now_playing_sync_{$station_id}", $current, false);
             } else {
                 $current = null; 
             }
@@ -1928,7 +1690,7 @@ function crjb_get_state() {
     $listeners = get_option("crjb_active_listeners_{$station_id}", []);
     if ($lid) { if($is_listening === 'true') $listeners[$lid] = $now; else unset($listeners[$lid]); }
     foreach($listeners as $k => $v) if($now - $v > 15) unset($listeners[$k]);
-    update_option("crjb_active_listeners_{$station_id}", $listeners, 'no');
+    update_option("crjb_active_listeners_{$station_id}", $listeners, false);
 
     $cp = crjb_process_queue_and_get_current($station_id);
     $q = get_transient("crjb_active_queue_{$station_id}") ?: [];
@@ -2184,7 +1946,7 @@ function crjb_render_frontend_app($atts) {
         ksort($active_atts);
         $station_hash = substr(md5(json_encode($active_atts)), 0, 10);
         $station_id = 'station_' . $station_hash;
-        add_option('crjb_station_args_' . $station_id, $active_atts, '', 'no');
+        add_option('crjb_station_args_' . $station_id, $active_atts, '', false);
     }
 
     $station_label = crjb_get_station_label($station_id);
@@ -2319,7 +2081,7 @@ function crjb_render_frontend_app($atts) {
 // 6. FRONTEND VISITOR MP3 UPLOADER
 // ==========================================
 
-add_shortcode('crjb_submit_mp3', 'crjb_render_frontend_uploader_shortcode');
+add_shortcode('community_radio_jukebox_submit_mp3', 'crjb_render_frontend_uploader_shortcode');
 
 function crjb_render_frontend_uploader_shortcode() {
     // Only allow rendering if the admin enabled submissions in the Jukebox settings
@@ -2348,75 +2110,83 @@ function crjb_render_frontend_uploader_shortcode() {
             </button>
         </form>
     </div>
-
-    <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('crjb-upload-form');
-        const alertBox = document.getElementById('crjb-upload-alert');
-        const submitBtn = document.getElementById('crjb-upload-submit');
-
-        if(form) {
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const fileInput = document.getElementById('crjb_audio_file');
-                if (!fileInput.files.length) return;
-
-                // Client-side file size limit check (e.g., 25MB max)
-                const fileSize = fileInput.files[0].size / 1024 / 1024;
-                if (fileSize > 25) {
-                    alertBox.style.display = 'block';
-                    alertBox.style.backgroundColor = '#f8d7da';
-                    alertBox.style.color = '#721c24';
-                    alertBox.innerText = 'File is too large. Please upload an MP3 under 25MB.';
-                    return;
-                }
-
-                const formData = new FormData(form);
-                formData.append('action', 'crjb_process_visitor_upload');
-
-                submitBtn.innerText = 'Uploading... Please wait.';
-                submitBtn.style.opacity = '0.7';
-                submitBtn.disabled = true;
-                alertBox.style.display = 'none';
-
-                fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    alertBox.style.display = 'block';
-                    if (data.success) {
-                        alertBox.style.backgroundColor = '#d4edda';
-                        alertBox.style.color = '#155724';
-                        alertBox.style.border = '1px solid #c3e6cb';
-                        alertBox.innerText = 'Success! Your track has been uploaded securely.';
-                        form.reset();
-                    } else {
-                        alertBox.style.backgroundColor = '#f8d7da';
-                        alertBox.style.color = '#721c24';
-                        alertBox.style.border = '1px solid #f5c6cb';
-                        alertBox.innerText = 'Error: ' + data.data;
-                    }
-                })
-                .catch(error => {
-                    alertBox.style.display = 'block';
-                    alertBox.style.backgroundColor = '#f8d7da';
-                    alertBox.style.color = '#721c24';
-                    alertBox.innerText = 'A network error occurred. The file may be larger than your server limits allow.';
-                })
-                .finally(() => {
-                    submitBtn.innerText = 'Upload Track';
-                    submitBtn.style.opacity = '1';
-                    submitBtn.disabled = false;
-                });
-            });
-        }
-    });
-    </script>
     <?php
     return ob_get_clean();
+}
+
+add_action('wp_enqueue_scripts', 'crjb_enqueue_visitor_upload_script');
+function crjb_enqueue_visitor_upload_script() {
+    global $post;
+    if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'community_radio_jukebox_submit_mp3' ) ) {
+        wp_register_script('crjb-upload-script', false, [], false, true);
+        wp_enqueue_script('crjb-upload-script');
+        $custom_js = "
+            document.addEventListener('DOMContentLoaded', function() {
+                const form = document.getElementById('crjb-upload-form');
+                const alertBox = document.getElementById('crjb-upload-alert');
+                const submitBtn = document.getElementById('crjb-upload-submit');
+
+                if(form) {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        
+                        const fileInput = document.getElementById('crjb_audio_file');
+                        if (!fileInput.files.length) return;
+
+                        const fileSize = fileInput.files[0].size / 1024 / 1024;
+                        if (fileSize > 25) {
+                            alertBox.style.display = 'block';
+                            alertBox.style.backgroundColor = '#f8d7da';
+                            alertBox.style.color = '#721c24';
+                            alertBox.innerText = 'File is too large. Please upload an MP3 under 25MB.';
+                            return;
+                        }
+
+                        const formData = new FormData(form);
+                        formData.append('action', 'crjb_process_visitor_upload');
+
+                        submitBtn.innerText = 'Uploading... Please wait.';
+                        submitBtn.style.opacity = '0.7';
+                        submitBtn.disabled = true;
+                        alertBox.style.display = 'none';
+
+                        fetch('" . esc_url(admin_url('admin-ajax.php')) . "', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            alertBox.style.display = 'block';
+                            if (data.success) {
+                                alertBox.style.backgroundColor = '#d4edda';
+                                alertBox.style.color = '#155724';
+                                alertBox.style.border = '1px solid #c3e6cb';
+                                alertBox.innerText = 'Success! Your track has been uploaded securely.';
+                                form.reset();
+                            } else {
+                                alertBox.style.backgroundColor = '#f8d7da';
+                                alertBox.style.color = '#721c24';
+                                alertBox.style.border = '1px solid #f5c6cb';
+                                alertBox.innerText = 'Error: ' + data.data;
+                            }
+                        })
+                        .catch(error => {
+                            alertBox.style.display = 'block';
+                            alertBox.style.backgroundColor = '#f8d7da';
+                            alertBox.style.color = '#721c24';
+                            alertBox.innerText = 'A network error occurred. The file may be larger than your server limits allow.';
+                        })
+                        .finally(() => {
+                            submitBtn.innerText = 'Upload Track';
+                            submitBtn.style.opacity = '1';
+                            submitBtn.disabled = false;
+                        });
+                    });
+                }
+            });
+        ";
+        wp_add_inline_script('crjb-upload-script', $custom_js);
+    }
 }
 
 add_action('wp_ajax_crjb_process_visitor_upload', 'crjb_process_visitor_upload_handler');
