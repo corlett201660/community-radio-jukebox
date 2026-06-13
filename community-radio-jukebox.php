@@ -2316,6 +2316,12 @@ function crjb_render_frontend_app($atts) {
                 <div id="crjb-catalog-container">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
                         <h3 style="font-size:15px; font-weight:800; margin:0;">Catalog</h3>
+                        
+                        <div style="flex-grow: 1; min-width: 200px; position: relative;">
+                            <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--crjb-sec);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="search" id="crjb-search-input" placeholder="Search track or artist..." style="width: 100%; padding: 8px 10px 8px 32px; border-radius: 12px; border: 1px solid var(--crjb-border); background: var(--crjb-bg); color: var(--crjb-text); font-size: 14px; outline: none; box-sizing: border-box;" />
+                        </div>
+
                         <div style="display:flex; align-items:center; gap:10px;">
                             <label style="font-size:11px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:5px; margin:0;">
                                 <input type="checkbox" id="crjb-available-only" style="margin:0; cursor:pointer;"> Available Only
