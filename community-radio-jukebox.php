@@ -260,6 +260,19 @@ function crjb_import_scan_page() {
                 </td>
             </tr>
         </table>
+
+        <hr style="margin: 30px 0;">
+        <h2>Storage Management</h2>
+        <table class="form-table">
+            <tr>
+                <th scope="row">Orphaned Audio Cleanup</th>
+                <td>
+                    <button type="button" id="crjb_cleanup_audio_btn" class="button button-secondary" style="color: #d63638; border-color: #d63638;">Delete Unused MP3s</button>
+                    <span id="crjb_cleanup_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
+                    <p class="description"><strong>Warning:</strong> This permanently deletes any MP3 file in your WordPress Media Library that is <strong>not</strong> actively attached to a Jukebox Song (as a main track, intro, or outro). Ensure you aren't using these MP3s on other pages of your site!</p>
+                </td>
+            </tr>
+        </table>
     </div>
 
     <script>
@@ -339,6 +352,28 @@ function crjb_import_scan_page() {
                 status.css('color', '#d63638').text('Server timeout or error.');
                 btn.prop('disabled', false);
                 scanBtn.prop('disabled', false);
+            });
+        });
+
+        $('#crjb_cleanup_audio_btn').click(function(e) {
+            e.preventDefault();
+            if(!confirm('WARNING: This will permanently delete any MP3 from your WordPress Media Library that is not linked to the Jukebox. Proceed?')) return;
+            
+            let btn = $(this);
+            let status = $('#crjb_cleanup_status');
+            btn.prop('disabled', true);
+            status.css('color', '#000').text('Scanning and cleaning up storage...');
+
+            $.post(ajaxurl, { action: 'crjb_cleanup_orphaned_audio', security: '<?php echo esc_js($gemini_nonce); ?>' }, function(res) {
+                if(res.success) {
+                    status.css('color', '#28a745').text(res.data.msg);
+                } else {
+                    status.css('color', '#d63638').text('Error: ' + res.data);
+                }
+                btn.prop('disabled', false);
+            }).fail(function() {
+                status.css('color', '#d63638').text('Server timeout or error. Check PHP error logs.');
+                btn.prop('disabled', false);
             });
         });
 
@@ -2503,4 +2538,57 @@ function crjb_process_visitor_upload_handler() {
     }
 
     wp_send_json_success('File successfully uploaded to the Media Library.');
+}
+
+add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
+function crjb_cleanup_orphaned_audio_handler() {
+    // 1. Verify Security & Permissions
+    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
+        wp_send_json_error('Security check failed.');
+    }
+    // Note: Deleting files requires higher privileges
+    if (!current_user_can('delete_posts')) {
+        wp_send_json_error('Unauthorized.');
+    }
+
+    global $wpdb;
+
+    // 2. Collect all actively used attachment IDs across main tracks, intros, and outros
+    $used_main = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_audio_attachment_id' AND meta_value != ''");
+    $used_intro = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_intro_attachment_id' AND meta_value != ''");
+    $used_outro = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_outro_attachment_id' AND meta_value != ''");
+
+    // Merge and clean the list of protected IDs
+    $all_used_ids = array_unique(array_filter(array_map('intval', array_merge($used_main, $used_intro, $used_outro))));
+
+    // 3. Query all audio attachments in the Media Library
+    $args = [
+        'post_type'      => 'attachment',
+        'post_mime_type' => 'audio/mpeg', // Targets MP3s
+        'post_status'    => 'inherit',
+        'posts_per_page' => -1,
+        'fields'         => 'ids'
+    ];
+
+    // Exclude the protected ones
+    if (!empty($all_used_ids)) {
+        $args['post__not_in'] = $all_used_ids;
+    }
+
+    $orphaned_mp3s = get_posts($args);
+
+    if (empty($orphaned_mp3s)) {
+        wp_send_json_success(['msg' => 'Your library is perfectly clean. No orphaned MP3s found.']);
+    }
+
+    // 4. Delete the orphaned files and their WP attachment posts
+    $deleted_count = 0;
+    foreach ($orphaned_mp3s as $attachment_id) {
+        // The 'true' parameter forces deletion, bypassing the trash
+        if (wp_delete_attachment($attachment_id, true)) {
+            $deleted_count++;
+        }
+    }
+
+    wp_send_json_success(['msg' => "Success! Permanently deleted {$deleted_count} orphaned MP3s from your server."]);
 }
