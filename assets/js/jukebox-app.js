@@ -20,12 +20,16 @@ document.addEventListener("DOMContentLoaded", function() {
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
     localStorage.setItem('crjb_l_id', lId);
 
+    let currentCatPage = 1;
+    const itemsPerPage = 10;
+
     const availableOnlyCheckbox = document.getElementById('crjb-available-only');
     const savedAvailableOnly = localStorage.getItem('crjb_available_only') === 'true';
     availableOnlyCheckbox.checked = savedAvailableOnly;
 
     availableOnlyCheckbox.addEventListener('change', (e) => {
         localStorage.setItem('crjb_available_only', e.target.checked);
+        currentCatPage = 1;
         renderCat();
     });
 
@@ -557,21 +561,21 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentGenreFilter = null;
 
     window.viewArtist = (artistName) => {
-        currentArtistFilter = artistName; currentGenreFilter = null; 
+        currentArtistFilter = artistName; currentGenreFilter = null; currentCatPage = 1;
         document.getElementById('crjb-filter-text').innerText = 'Showing tracks by: ' + artistName;
         document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
         document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
     
     window.viewGenre = (genreName) => {
-        currentGenreFilter = genreName; currentArtistFilter = null; 
+        currentGenreFilter = genreName; currentArtistFilter = null; currentCatPage = 1;
         document.getElementById('crjb-filter-text').innerText = 'Showing genre: ' + genreName;
         document.getElementById('crjb-artist-filter-header').style.display = 'flex'; renderCat();
         document.getElementById('crjb-artist-filter-header').scrollIntoView({behavior: 'smooth', block: 'start'});
     };
 
     window.clearArtistFilter = () => { 
-        currentArtistFilter = null; currentGenreFilter = null; 
+        currentArtistFilter = null; currentGenreFilter = null; currentCatPage = 1;
         document.getElementById('crjb-artist-filter-header').style.display = 'none'; 
         renderCat(); 
     };
@@ -667,10 +671,12 @@ document.addEventListener("DOMContentLoaded", function() {
             return; 
         }
         
-        l.innerHTML = '';
         let votedIds = getVotedSongs();
+        let htmlBuffer = ''; 
 
-        sorted.forEach(s => {
+        const paginated = sorted.slice(0, currentCatPage * itemsPerPage);
+
+        paginated.forEach(s => {
             let sTitle = escapeHTML(s.title); let sArtist = escapeHTML(s.artist); let sLink = escapeHTML(s.permalink);
             let badge = ''; let isLocked = s.cooldown > 0 || s.is_playing || s.is_locked_by_schedule;
             let eBadge = s.is_explicit ? '<span class="crjb-explicit-badge" title="Explicit Content">E</span>' : '';
@@ -691,8 +697,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 ? '<button class="crjb-btn crjb-btn-vote crjb-voted" disabled>' + svgs.check + '</button>'
                 : '<button class="crjb-btn crjb-btn-vote" onclick="voteSong(' + s.id + ', \'' + safeVoteTitle + '\')">' + svgs.plus + '</button>';
 
-            l.innerHTML += '<li class="crjb-track-item ' + (isLocked ? 'crjb-locked' : '') + '"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
+            htmlBuffer += '<li class="crjb-track-item ' + (isLocked ? 'crjb-locked' : '') + '"><div class="crjb-track-info"><h4 style="margin:0 0 5px 0; display:flex; align-items:center;"><a href="' + sLink + '" style="color:inherit; text-decoration:none;" target="_blank">' + sTitle + '</a> ' + eBadge + ' ' + cIcon + '</h4><div style="margin-bottom: 2px;"><span class="crjb-clickable-artist" onclick="viewArtist(this.innerText)">' + sArtist + '</span></div>' + badge + gBadge + '</div><div style="display:flex; gap:8px; align-items: center;">' + lyricsBtn + '<button class="crjb-btn" onclick="previewSong(\'' + safePreviewUrl + '\', \'' + safeVoteTitle + '\', \'' + safeArtistQuote + '\')">' + svgs.play + '</button>' + voteBtnHtml + '</div></li>';
         });
+
+        if (sorted.length > currentCatPage * itemsPerPage) {
+            htmlBuffer += '<li id="crjb-load-more" style="grid-column: 1 / -1; text-align:center; padding:15px; cursor:pointer; background:var(--crjb-accent); color:#fff; border-radius:12px; font-weight:800; margin-top:10px; transition: opacity 0.2s;">Load More Tracks...</li>';
+        }
+
+        l.innerHTML = htmlBuffer;
+
+        const loadBtn = document.getElementById('crjb-load-more');
+        if (loadBtn) {
+            loadBtn.onclick = () => {
+                currentCatPage++;
+                renderCat();
+            };
+        }
     }
     
     function stopPreview() {
@@ -765,5 +785,5 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     
     poll(); loadCat(); setInterval(loadCat, 60000); setInterval(poll, 5000);
-    document.getElementById('crjb-catalog-sort').onchange = renderCat;
+    document.getElementById('crjb-catalog-sort').onchange = () => { currentCatPage = 1; renderCat(); };
 });
