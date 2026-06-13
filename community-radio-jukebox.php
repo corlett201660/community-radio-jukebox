@@ -87,8 +87,6 @@ function crjb_register_settings() {
     register_setting('crjb_settings_group', 'crjb_strict_event_mode', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
     register_setting('crjb_settings_group', 'crjb_submission_url', ['type' => 'string', 'sanitize_callback' => 'esc_url_raw']);
     register_setting('crjb_settings_group', 'crjb_wipe_on_uninstall', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
-    register_setting('crjb_settings_group', 'crjb_ai_host_enabled', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean']);
-    register_setting('crjb_settings_group', 'crjb_ai_host_placement', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'intro']);
 }
 
 function crjb_settings_page() {
@@ -103,23 +101,6 @@ function crjb_settings_page() {
                     <td>
                         <p class="description" style="margin-top: 0; color: #0073aa; font-weight: 600;">API Keys are now securely managed centrally by WordPress.</p>
                         <p class="description">To enable AI Audio Scanning (Explicit Flags, Genres & Lyrics), please ensure the Google AI provider is installed and your key is configured under <strong>Settings &gt; Connectors</strong>.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">Enable AI Radio Host</th>
-                    <td>
-                        <input type="checkbox" name="crjb_ai_host_enabled" value="1" <?php checked(1, get_option('crjb_ai_host_enabled'), true); ?> />
-                        <label>Automatically generate a TTS voice drop reading the custom banner text.</label>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">AI Host Placement</th>
-                    <td>
-                        <select name="crjb_ai_host_placement">
-                            <option value="intro" <?php selected('intro', get_option('crjb_ai_host_placement', 'intro')); ?>>Before Song (Intro)</option>
-                            <option value="outro" <?php selected('outro', get_option('crjb_ai_host_placement', 'intro')); ?>>After Song (Outro)</option>
-                        </select>
-                        <p class="description">Determines where the generated AI audio will be injected into the track timeline.</p>
                     </td>
                 </tr>
                 <tr>
@@ -466,59 +447,6 @@ function crjb_force_curl_timeout( $handle, $args, $url ) {
     if ( strpos( $url, 'generativelanguage.googleapis.com' ) !== false ) {
         curl_setopt( $handle, CURLOPT_TIMEOUT, 150 );
         curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, 150 );
-    }
-}
-
-function crjb_generate_radio_host_drop($post_id, $banner_text) {
-    // Note: Assuming your AI connector stores the key under this option
-    $api_key = get_option('google_gemini_api_key', ''); 
-    if (empty($api_key)) return;
-
-    $clean_text = wp_strip_all_tags($banner_text);
-    if (empty($clean_text)) return;
-
-    $placement = get_option('crjb_ai_host_placement', 'intro');
-    $target_url_meta = $placement . '_audio_url';
-    $target_dur_meta = $placement . '_duration';
-
-    // Format the spoken string naturally based on the placement
-    $spoken_text = ($placement === 'intro') ? "Up next... " . $clean_text : "That was... " . $clean_text;
-
-    $endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:synthesizeSpeech?key=" . $api_key;
-    
-    $payload = [
-        'input' => ['text' => $spoken_text],
-        'voice' => ['name' => 'gemini-en-US-Aoede']
-    ];
-
-    $response = wp_remote_post($endpoint, [
-        'body'    => wp_json_encode($payload),
-        'headers' => ['Content-Type' => 'application/json'],
-        'timeout' => 15
-    ]);
-
-    if (is_wp_error($response)) return;
-
-    $body = json_decode(wp_remote_retrieve_body($response), true);
-    if (empty($body['audioContent'])) return;
-
-    // Decode the base64 audio string and save it to the WordPress Uploads directory
-    $audio_data = base64_decode($body['audioContent']);
-    $upload_dir = wp_upload_dir();
-    $filename   = 'ai-host-drop-' . $post_id . '-' . time() . '.mp3';
-    $filepath   = trailingslashit($upload_dir['path']) . $filename;
-
-    if (file_put_contents($filepath, $audio_data)) {
-        $file_url = trailingslashit($upload_dir['url']) . $filename;
-        
-        // Directly assign the newly generated audio file to the existing frontend DJ Drop slots
-        update_post_meta($post_id, $target_url_meta, esc_url_raw($file_url));
-        
-        require_once( ABSPATH . 'wp-admin/includes/media.php' );
-        $meta = wp_read_audio_metadata($filepath);
-        if (!empty($meta['length'])) {
-            update_post_meta($post_id, $target_dur_meta, ceil($meta['length']));
-        }
     }
 }
 
@@ -955,9 +883,8 @@ function crjb_tutorial_page() {
         </div>
 
         <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #6f42c1; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
-            <h2 style="margin-top: 0;">8. AI Radio Host & DJ Drops</h2>
+            <h2 style="margin-top: 0;">8. DJ Drops</h2>
             <p>Bring your station to life with dynamic vocal drops! You can upload your own custom Intro and Outro voice memos on any song's edit page.</p>
-            <p>Alternatively, enable the <strong>AI Radio Host</strong> in your settings. Whenever you add a "Custom Scrolling Banner" to a track (e.g., "Happy Birthday Sarah!"), Gemini's text-to-speech engine will instantly generate a polished radio voice reading your banner, seamlessly injecting it before or after the song plays.</p>
         </div>
 
     </div>
@@ -1237,7 +1164,7 @@ function crjb_song_details_callback( $post ) {
             <th><label>Custom Scrolling Banner</label></th>
             <td>
                 <input type="text" name="crjb_custom_banner_text" value="<?php echo esc_attr($custom_banner); ?>" class="regular-text" style="width: 100%;" />
-                <p class="description">Overrides the default "Submitted by" text. HTML is allowed (e.g., <code>&lt;strong&gt;Happy Birthday Sarah!&lt;/strong&gt;</code>). This will side-scroll horizontally in the frontend Jukebox interface. <em>Note: Saving a new banner here will trigger AI Voice Generation if enabled in settings.</em></p>
+                <p class="description">Overrides the default "Submitted by" text. HTML is allowed (e.g., <code>&lt;strong&gt;Happy Birthday Sarah!&lt;/strong&gt;</code>). This will side-scroll horizontally in the frontend Jukebox interface.</p>
             </td>
         </tr>
         <tr><th><label>Network Sync MP3</label></th><td>
@@ -1454,14 +1381,8 @@ function crjb_save_custom_meta_data( $post_id ) {
         }
         
         if ( isset($_POST['crjb_custom_banner_text']) ) {
-            $old_banner = get_post_meta($post_id, 'crjb_custom_banner_text', true);
             $new_banner = wp_kses_post(wp_unslash($_POST['crjb_custom_banner_text']));
             update_post_meta($post_id, 'crjb_custom_banner_text', $new_banner);
-            
-            // Trigger TTS Generation if enabled and the text changed
-            if (get_option('crjb_ai_host_enabled') && $old_banner !== $new_banner && !empty($new_banner)) {
-                crjb_generate_radio_host_drop($post_id, $new_banner);
-            }
         }
         
         if ( isset($_POST['crjb_lyrics']) ) {
