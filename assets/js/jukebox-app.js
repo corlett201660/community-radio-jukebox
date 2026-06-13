@@ -20,8 +20,11 @@ document.addEventListener("DOMContentLoaded", function() {
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
     localStorage.setItem('crjb_l_id', lId);
 
+    // NEW: Pagination & Search State
     let currentCatPage = 1;
     const itemsPerPage = 10;
+    let currentSearchQuery = ''; 
+    let searchDebounceTimer;     
 
     const availableOnlyCheckbox = document.getElementById('crjb-available-only');
     const savedAvailableOnly = localStorage.getItem('crjb_available_only') === 'true';
@@ -32,6 +35,20 @@ document.addEventListener("DOMContentLoaded", function() {
         currentCatPage = 1;
         renderCat();
     });
+
+    // NEW: Mobile-friendly Search Event Listener
+    const searchInput = document.getElementById('crjb-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchDebounceTimer);
+            // Wait 300ms after the user stops typing to prevent keyboard lag
+            searchDebounceTimer = setTimeout(() => {
+                currentSearchQuery = e.target.value.toLowerCase().trim();
+                currentCatPage = 1; // Always reset to page 1 on new search
+                renderCat();
+            }, 300);
+        });
+    }
 
     const svgs = {
         moon: '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>',
@@ -603,6 +620,16 @@ document.addEventListener("DOMContentLoaded", function() {
         const showAvailable = availableOnlyCheckbox.checked;
 
         let sorted = [...catData];
+
+        // NEW: Apply text search filter
+        if (currentSearchQuery !== '') {
+            sorted = sorted.filter(song => 
+                song.title.toLowerCase().includes(currentSearchQuery) || 
+                song.artist.toLowerCase().includes(currentSearchQuery) ||
+                (song.genre && song.genre.toLowerCase().includes(currentSearchQuery))
+            );
+        }
+
         if (currentArtistFilter) sorted = sorted.filter(song => song.artist === currentArtistFilter);
         if (currentGenreFilter) sorted = sorted.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
         
@@ -617,6 +644,16 @@ document.addEventListener("DOMContentLoaded", function() {
             
             if (catData.length > 0) {
                 let targetData = [...catData];
+                
+                // Keep the search filter alive in the empty state checker
+                if (currentSearchQuery !== '') {
+                    targetData = targetData.filter(song => 
+                        song.title.toLowerCase().includes(currentSearchQuery) || 
+                        song.artist.toLowerCase().includes(currentSearchQuery) ||
+                        (song.genre && song.genre.toLowerCase().includes(currentSearchQuery))
+                    );
+                }
+                
                 if (currentArtistFilter) targetData = targetData.filter(song => song.artist === currentArtistFilter);
                 if (currentGenreFilter) targetData = targetData.filter(song => song.genre && song.genre.split(', ').includes(currentGenreFilter));
                 
@@ -663,6 +700,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     } else {
                         emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks currently available to request.</li>';
                     }
+                } else if (currentSearchQuery !== '') { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found matching your search.</li>';
                 } else if (currentArtistFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this artist.</li>';
                 } else if (currentGenreFilter) { emptyMsg = '<li style="padding:15px; text-align:center; grid-column: 1 / -1;">No tracks found for this genre.</li>'; }
             }
