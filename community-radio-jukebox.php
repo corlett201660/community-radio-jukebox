@@ -71,8 +71,8 @@ function crjb_register_cpts_and_taxonomies() {
         'public' => false, 'show_ui' => true, 'show_in_menu' => 'edit.php?post_type=crjb_song', 'supports' => [ 'title' ],
     ]);
 
-    register_taxonomy( 'crjb_playlist', 'crjb_song', [ 'labels' => [ 'name' => 'Playlists' ], 'hierarchical' => true, 'show_ui' => true ]);
-    register_taxonomy( 'crjb_artist', 'crjb_song', [ 'labels' => [ 'name' => 'Artists' ], 'hierarchical' => false, 'show_ui' => true ]);
+    register_taxonomy( 'crjb_playlist', 'crjb_song', [ 'labels' => [ 'name' => 'Playlists' ], 'hierarchical' => true, 'show_ui' => true, 'show_admin_column' => true ]);
+	register_taxonomy( 'crjb_artist', 'crjb_song', [ 'labels' => [ 'name' => 'Artists' ], 'hierarchical' => false, 'show_ui' => true, 'show_admin_column' => true ]);
     register_taxonomy( 'crjb_submitter', 'crjb_song', [ 'labels' => [ 'name' => 'Submitters' ], 'hierarchical' => false, 'show_ui' => true ]);
     register_taxonomy( 'crjb_genre', 'crjb_song', [ 'labels' => [ 'name' => 'Genres', 'singular_name' => 'Genre' ], 'hierarchical' => true, 'show_ui' => true, 'show_admin_column' => true ]);
 }
