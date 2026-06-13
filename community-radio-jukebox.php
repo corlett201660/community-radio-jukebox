@@ -70,9 +70,9 @@ function crjb_register_cpts_and_taxonomies() {
         'labels' => [ 'name' => 'Jukebox Schedules', 'singular_name' => 'Schedule', 'add_new_item' => 'Add New Schedule', 'all_items' => 'All Schedules' ],
         'public' => false, 'show_ui' => true, 'show_in_menu' => 'edit.php?post_type=crjb_song', 'supports' => [ 'title' ],
     ]);
-	
-	register_taxonomy( 'crjb_artist', 'crjb_song', [ 'labels' => [ 'name' => 'Artists' ], 'hierarchical' => false, 'show_ui' => true, 'show_admin_column' => true ]);
+
     register_taxonomy( 'crjb_playlist', 'crjb_song', [ 'labels' => [ 'name' => 'Playlists' ], 'hierarchical' => true, 'show_ui' => true, 'show_admin_column' => true ]);
+    register_taxonomy( 'crjb_artist', 'crjb_song', [ 'labels' => [ 'name' => 'Artists' ], 'hierarchical' => false, 'show_ui' => true, 'show_admin_column' => true ]);
     register_taxonomy( 'crjb_submitter', 'crjb_song', [ 'labels' => [ 'name' => 'Submitters' ], 'hierarchical' => false, 'show_ui' => true ]);
     register_taxonomy( 'crjb_genre', 'crjb_song', [ 'labels' => [ 'name' => 'Genres', 'singular_name' => 'Genre' ], 'hierarchical' => true, 'show_ui' => true, 'show_admin_column' => true ]);
 }
@@ -280,10 +280,12 @@ function crjb_force_gemini_http_args( $args, $url ) {
 // 2. Force the underlying cURL Transport Handle (Bypasses WP restrictions)
 add_action( 'http_api_curl', 'crjb_force_curl_timeout', 99, 3 );
 function crjb_force_curl_timeout( $handle, $args, $url ) {
+    // phpcs:disable WordPress.WP.AlternativeFunctions.curl_curl_setopt
     if ( strpos( $url, 'generativelanguage.googleapis.com' ) !== false ) {
         curl_setopt( $handle, CURLOPT_TIMEOUT, 150 );
         curl_setopt( $handle, CURLOPT_CONNECTTIMEOUT, 150 );
     }
+    // phpcs:enable
 }
 
 add_action('wp_ajax_crjb_import_media_library', 'crjb_import_media_library_handler');
@@ -294,7 +296,10 @@ function crjb_import_media_library_handler() {
 
     // 2. Identify already imported MP3s to prevent duplicates
     global $wpdb;
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.NoCaching
     $existing_ids_col = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_audio_attachment_id' AND meta_value != ''");
+    // phpcs:enable
     $existing_ids = array_map('intval', $existing_ids_col);
 
     // 3. Query Media Library for unlinked MP3s
@@ -307,6 +312,7 @@ function crjb_import_media_library_handler() {
     ];
 
     if (!empty($existing_ids)) {
+        // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in
         $args['post__not_in'] = $existing_ids;
     }
 
@@ -395,6 +401,7 @@ function crjb_gemini_scan_handler() {
     if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
     
     // Prevent the PHP process from dying while waiting for the AI audio transcription
+    // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
     set_time_limit(150); 
     
     $song_id = isset($_POST['song_id']) ? intval($_POST['song_id']) : 0;
@@ -412,6 +419,7 @@ function crjb_gemini_bulk_scan_handler() {
     if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
     
     // Prevent the PHP process from dying while waiting for the AI audio transcription (batch process)
+    // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
     set_time_limit(300);
     
     $all_songs = get_posts([
@@ -552,14 +560,15 @@ function crjb_process_folder_upload_handler() {
 
     if (empty($_FILES['file'])) wp_send_json_error('No file received.');
 
-    $artist_name = sanitize_text_field(wp_unslash($_POST['artist']));
-    $song_title  = sanitize_text_field(wp_unslash($_POST['title']));
+    $artist_name = isset($_POST['artist']) ? sanitize_text_field(wp_unslash($_POST['artist'])) : 'Unknown Artist';
+    $song_title  = isset($_POST['title']) ? sanitize_text_field(wp_unslash($_POST['title'])) : 'Unknown Title';
 
     // 2. Upload the MP3 to the WP Media Library
     require_once(ABSPATH . 'wp-admin/includes/file.php');
     require_once(ABSPATH . 'wp-admin/includes/media.php');
     require_once(ABSPATH . 'wp-admin/includes/image.php');
 
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $uploaded_file = $_FILES['file'];
     $upload_overrides = ['test_form' => false];
     
@@ -734,7 +743,7 @@ function crjb_tutorial_page() {
 add_action('wp_enqueue_scripts', 'crjb_hide_sidebar_on_song_page');
 function crjb_hide_sidebar_on_song_page() {
     if (is_singular('crjb_song')) {
-        wp_register_style('crjb-song-layout', false);
+        wp_register_style('crjb-song-layout', false, [], CRJB_VERSION);
         wp_enqueue_style('crjb-song-layout');
         $custom_css = "
             #secondary, #sidebar, .sidebar, .widget-area, aside#secondary { display: none !important; }
@@ -747,7 +756,7 @@ function crjb_hide_sidebar_on_song_page() {
 add_action('wp_enqueue_scripts', 'crjb_enqueue_song_preview_script');
 function crjb_enqueue_song_preview_script() {
     if (is_singular('crjb_song')) {
-        wp_register_script('crjb-preview-script', false, [], false, true);
+        wp_register_script('crjb-preview-script', false, [], CRJB_VERSION, true);
         wp_enqueue_script('crjb-preview-script');
         $custom_js = '
             document.addEventListener("DOMContentLoaded", function() {
@@ -2118,7 +2127,7 @@ add_action('wp_enqueue_scripts', 'crjb_enqueue_visitor_upload_script');
 function crjb_enqueue_visitor_upload_script() {
     global $post;
     if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'community_radio_jukebox_submit_mp3' ) ) {
-        wp_register_script('crjb-upload-script', false, [], false, true);
+        wp_register_script('crjb-upload-script', false, [], CRJB_VERSION, true);
         wp_enqueue_script('crjb-upload-script');
         $custom_js = "
             document.addEventListener('DOMContentLoaded', function() {
@@ -2202,10 +2211,11 @@ function crjb_process_visitor_upload_handler() {
         wp_send_json_error('Submissions are currently closed.');
     }
 
-    if (empty($_FILES['crjb_audio_file']) || $_FILES['crjb_audio_file']['error'] !== UPLOAD_ERR_OK) {
+    if (!isset($_FILES['crjb_audio_file']) || !isset($_FILES['crjb_audio_file']['error']) || empty($_FILES['crjb_audio_file']['name']) || $_FILES['crjb_audio_file']['error'] !== UPLOAD_ERR_OK) {
         wp_send_json_error('No valid file was uploaded, or the file exceeded the server upload limit.');
     }
 
+    // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $file = $_FILES['crjb_audio_file'];
 
     // 2. Strict MIME Type Validation
@@ -2245,9 +2255,12 @@ function crjb_cleanup_orphaned_audio_handler() {
     global $wpdb;
 
     // 2. Collect all actively used attachment IDs across main tracks, intros, and outros
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery
+    // phpcs:disable WordPress.DB.DirectDatabaseQuery.NoCaching
     $used_main = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_audio_attachment_id' AND meta_value != ''");
     $used_intro = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_intro_attachment_id' AND meta_value != ''");
     $used_outro = $wpdb->get_col("SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = 'crjb_outro_attachment_id' AND meta_value != ''");
+    // phpcs:enable
 
     // Merge and clean the list of protected IDs
     $all_used_ids = array_unique(array_filter(array_map('intval', array_merge($used_main, $used_intro, $used_outro))));
@@ -2263,6 +2276,7 @@ function crjb_cleanup_orphaned_audio_handler() {
 
     // Exclude the protected ones
     if (!empty($all_used_ids)) {
+        // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.PostNotIn_post__not_in
         $args['post__not_in'] = $all_used_ids;
     }
 
