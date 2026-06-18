@@ -108,7 +108,7 @@ function crjb_settings_page() {
                     <th scope="row">Google Gemini AI Setup</th>
                     <td>
                         <p class="description" style="margin-top: 0; color: #0073aa; font-weight: 600;">API Keys are now securely managed centrally by WordPress.</p>
-                        <p class="description">To enable AI Audio Scanning (Explicit Flags, Genres & Lyrics), please ensure the Google AI provider is installed and your key is configured under <strong>Settings &gt; Connectors</strong>.</p>
+                        <p class="description">To enable AI Audio Scanning (Explicit Flags, Genres & Transcriptions), please ensure the Google AI provider is installed and your key is configured under <strong>Settings &gt; Connectors</strong>.</p>
                     </td>
                 </tr>
                 <tr>
@@ -203,7 +203,7 @@ function crjb_import_scan_page() {
         <h2>Gemini AI Bulk Catalog Scanner</h2>
         <table class="form-table">
             <tr>
-                <th scope="row">Auto Tag Missing Genres, Explicit Flags & Lyrics</th>
+                <th scope="row">Auto Tag Missing Genres, Explicit Flags & Transcriptions</th>
                 <td>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <button type="button" id="crjb_bulk_scan_btn" class="button button-primary">Scan Incomplete Library</button>
@@ -211,7 +211,7 @@ function crjb_import_scan_page() {
                     </div>
                     <span id="crjb_bulk_status" style="display:block; margin-top:10px; font-weight:bold;"></span>
                     <p class="description"><strong>Scan Incomplete Library:</strong> Processes up to 10 songs missing standard layout vectors via the WP AI Client to prevent server timeouts.<br>
-                    <strong>Wipe All AI Data:</strong> Instantly deletes all AI generated Genres and Lyrics from every track in your catalog so you can start a fresh rescan.</p>
+                    <strong>Wipe All AI Data:</strong> Instantly deletes all AI generated Genres and Transcriptions from every track in your catalog so you can start a fresh rescan.</p>
                 </td>
             </tr>
         </table>
@@ -441,7 +441,7 @@ function crjb_gemini_bulk_scan_handler() {
     }
 
     if (empty($incomplete_songs)) {
-        wp_send_json_success(['processed' => 0, 'msg' => 'All songs already have genres and lyrics!']);
+        wp_send_json_success(['processed' => 0, 'msg' => 'All songs already have genres and transcriptions!']);
     }
 
     $processed = 0;
@@ -678,8 +678,8 @@ function crjb_tutorial_page() {
         <h1 style="margin-bottom: 20px;">Community Radio Jukebox: Manual & Workflows</h1>
 
         <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #0073aa; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
-            <h2 style="margin-top: 0;">1. AI Auto Tagging & Lyrics Transcription</h2>
-            <p>Ensure your preferred AI model is configured in the WordPress Settings > Connectors screen. When editing a Jukebox Song, click <strong>✨ Analyze Audio</strong>. The system will upload the MP3 via the WP AI Client, letting the AI listen to the track to automatically assign the correct Genres and transcribe the Lyrics.</p>
+            <h2 style="margin-top: 0;">1. AI Auto Tagging & Transcription</h2>
+            <p>Ensure your preferred AI model is configured in the WordPress Settings > Connectors screen. When editing a Jukebox Song, click <strong>✨ Analyze Audio</strong>. The system will upload the MP3 via the WP AI Client, letting the AI listen to the track to automatically assign the correct Genres and generate the Transcription.</p>
         </div>
 
         <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; border-left: 4px solid #28a745; box-shadow: 0 1px 1px rgba(0,0,0,.04); max-width: 800px; margin-bottom: 20px;">
@@ -898,10 +898,10 @@ function crjb_song_dedicated_page_content($content) {
         }
         
         if ($lyrics) {
-            $html .= '<h4 style="margin-top: 30px; font-weight: 800; font-size: 22px;">Lyrics</h4>';
+            $html .= '<h4 style="margin-top: 30px; font-weight: 800; font-size: 22px;">Transcription</h4>';
             $html .= '<blockquote style="white-space: pre-wrap; font-style: normal; font-size: 16px; line-height: 1.8; background: #f9f9f9; padding: 30px; border-left: 4px solid #0073aa; border-radius: 0 8px 8px 0; color: #333;">' . esc_html($lyrics) . '</blockquote>';
         } else {
-            $html .= '<p style="color: #888; font-style: italic; padding: 20px; text-align: center; background: #fafafa; border-radius: 8px;">No lyrics available or track has not been scanned.</p>';
+            $html .= '<p style="color: #888; font-style: italic; padding: 20px; text-align: center; background: #fafafa; border-radius: 8px;">No transcription available or track has not been scanned.</p>';
         }
         
         $html .= '</div>';
@@ -1031,7 +1031,7 @@ function crjb_song_details_callback( $post ) {
                 <button type="button" class="button button-secondary" id="crjb_upload_mp3_btn">Select Track MP3</button>
                 <button type="button" class="button button-primary" id="crjb_gemini_scan_btn">✨ Analyze Audio</button>
             </div>
-            <p class="description">Clicking <strong>Analyze Audio</strong> will run the file through Gemini 2.5 Pro to auto assign genres, explicit classification variables, and transcribe the lyrics below.</p>
+            <p class="description">Clicking <strong>Analyze Audio</strong> will run the file through Gemini 2.5 Pro to auto assign genres, explicit classification variables, and generate the transcription below.</p>
         </td></tr>
         <tr><th><label>Duration (Seconds)</label></th><td><input type="number" id="audio_duration" name="audio_duration" value="<?php echo esc_attr($audio_duration); ?>" readonly /></td></tr>
         <tr><th><label>Frontend Preview URL</label></th><td><input type="url" id="preview_url" name="preview_url" value="<?php echo esc_url($preview_url); ?>" style="width:100%;" /></td></tr>
@@ -1052,10 +1052,10 @@ function crjb_song_details_callback( $post ) {
             </div>
         </td></tr>
         <tr>
-            <th><label>Track Lyrics</label></th>
+            <th><label>Track Transcription</label></th>
             <td>
                 <textarea name="crjb_lyrics" rows="8" style="width:100%; font-family: monospace; padding: 10px;"><?php echo esc_textarea($lyrics); ?></textarea>
-                <p class="description">These lyrics will be displayed on the track's dedicated permalink page.</p>
+                <p class="description">This transcription will be displayed on the track's dedicated permalink page.</p>
             </td>
         </tr>
     </table>
