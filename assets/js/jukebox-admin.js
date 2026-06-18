@@ -58,7 +58,7 @@ jQuery(document).ready(function($){
 
     $('#crjb_clear_ai_data_btn').click(function(e) {
         e.preventDefault();
-        if(!confirm('WARNING: This will permanently delete ALL genres and lyrics from EVERY song in your library. You will need to rescan them afterwards. Are you sure?')) return;
+        if(!confirm('WARNING: This will permanently delete ALL genres and transcriptions from EVERY song in your library. You will need to rescan them afterwards. Are you sure?')) return;
         
         let btn = $(this);
         let scanBtn = $('#crjb_bulk_scan_btn');
@@ -234,7 +234,7 @@ jQuery(document).ready(function($){
                 let msg = "Success!";
                 if(res.data.genres) msg += '\nGenres assigned: ' + res.data.genres.join(', ');
                 if(res.data.explicit_status) msg += '\nRating status: ' + res.data.explicit_status;
-                if(res.data.lyrics_status) msg += '\nLyrics status: ' + res.data.lyrics_status;
+                if(res.data.lyrics_status) msg += '\nTranscription status: ' + res.data.lyrics_status;
                 alert(msg);
                 location.reload(); 
             } else {
