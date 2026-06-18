@@ -1179,12 +1179,14 @@ function crjb_save_custom_meta_data( $post_id ) {
                 $id = intval(wp_unslash($_POST[$attachment_key]));
                 $url = wp_get_attachment_url($id);
                 if ($url) {
+                    update_post_meta($post_id, $attachment_key, $id);
                     update_post_meta($post_id, $url_key, esc_url_raw($url));
                     require_once( ABSPATH . 'wp-admin/includes/media.php' );
                     $meta = wp_read_audio_metadata(get_attached_file($id));
                     if (!empty($meta['length'])) update_post_meta($post_id, $duration_key, ceil($meta['length']));
                 }
             } elseif (isset($_POST[$url_key]) && empty($_POST[$url_key])) {
+                delete_post_meta($post_id, $attachment_key);
                 delete_post_meta($post_id, $url_key);
                 delete_post_meta($post_id, $duration_key);
             }
