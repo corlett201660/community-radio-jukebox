@@ -2111,6 +2111,16 @@ function crjb_render_frontend_uploader_shortcode() {
         <form id="crjb-upload-form" enctype="multipart/form-data">
             <?php wp_nonce_field('crjb_frontend_upload_action', 'crjb_upload_nonce'); ?>
             
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Artist Name</label>
+                <input type="text" id="crjb_artist_name" name="crjb_artist_name" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa;" placeholder="Your Name or Band">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Song Title</label>
+                <input type="text" id="crjb_song_title" name="crjb_song_title" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa;" placeholder="Track Name">
+            </div>
+
             <div style="margin-bottom: 20px;">
                 <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Select MP3 File</label>
                 <input type="file" id="crjb_audio_file" name="crjb_audio_file" accept=".mp3,audio/mpeg" required style="width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa;">
@@ -2217,8 +2227,12 @@ function crjb_process_visitor_upload_handler() {
         wp_send_json_error('No valid file was uploaded, or the file exceeded the server upload limit.');
     }
 
+    // Capture the new form fields (fallback to filename if title is missing)
+    $artist_name = isset($_POST['crjb_artist_name']) ? sanitize_text_field(wp_unslash($_POST['crjb_artist_name'])) : 'Unknown Artist';
+    
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $file = $_FILES['crjb_audio_file'];
+    $song_title = isset($_POST['crjb_song_title']) && !empty($_POST['crjb_song_title']) ? sanitize_text_field(wp_unslash($_POST['crjb_song_title'])) : preg_replace('/\.[^.]+$/', '', basename($file['name']));
 
     // 2. Strict MIME Type Validation
     $allowed_mimes = ['audio/mpeg', 'audio/mp3'];
@@ -2240,7 +2254,40 @@ function crjb_process_visitor_upload_handler() {
         wp_send_json_error($attachment_id->get_error_message());
     }
 
-    wp_send_json_success('File successfully uploaded to the Media Library.');
+    // 5. Create the Jukebox Song Draft immediately
+    $post_id = wp_insert_post([
+        'post_title'  => $song_title,
+        'post_type'   => 'crjb_song',
+        'post_status' => 'draft'
+    ]);
+
+    if ($post_id) {
+        $attachment_url = wp_get_attachment_url($attachment_id);
+        $file_path = get_attached_file($attachment_id);
+
+        // Extract duration via WP audio metadata
+        $meta = wp_read_audio_metadata($file_path);
+        $duration = !empty($meta['length']) ? ceil($meta['length']) : 180;
+
+        // Attach the audio metadata
+        update_post_meta($post_id, 'crjb_audio_attachment_id', $attachment_id);
+        update_post_meta($post_id, 'full_audio_url', esc_url_raw($attachment_url));
+        update_post_meta($post_id, 'preview_url', esc_url_raw($attachment_url));
+        update_post_meta($post_id, 'audio_duration', $duration);
+        
+        // Set base safety defaults
+        update_post_meta($post_id, 'crjb_is_explicit', '0');
+        update_post_meta($post_id, 'crjb_royalty_free', '0');
+        update_post_meta($post_id, 'crjb_always_available', '0');
+        
+        // Assign the User-Provided Artist Taxonomy
+        wp_set_object_terms($post_id, $artist_name, 'crjb_artist', false);
+
+        update_option('crjb_catalog_version', time(), false);
+        wp_send_json_success('Success! Your track has been uploaded securely.');
+    } else {
+        wp_send_json_error('File uploaded, but failed to generate the Draft submission.');
+    }
 }
 
 add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
