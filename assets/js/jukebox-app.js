@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const infoToggleBtn = document.getElementById('crjb-info-toggle'), infoPanel = document.getElementById('crjb-info-panel');
     const scheduleToggleBtn = document.getElementById('crjb-schedule-toggle'), schedulePanel = document.getElementById('crjb-schedule-panel');
     const catalogToggleBtn = document.getElementById('crjb-catalog-toggle'), catalogContainer = document.getElementById('crjb-catalog-container');
+    const settingsToggleBtn = document.getElementById('crjb-settings-toggle'), settingsPanel = document.getElementById('crjb-settings-panel');
     const alertContainer = document.getElementById('crjb-alert-container');
     
     // Pulling localized variables safely from WordPress
@@ -20,7 +21,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let clientCatalogVersion = 0; let isPreviewing = false; let currentPreviewUrl = ''; 
     localStorage.setItem('crjb_l_id', lId);
 
-    // NEW: Pagination & Search State
+    // Pagination & Search State
     let currentCatPage = 1;
     const itemsPerPage = 10;
     let currentSearchQuery = ''; 
@@ -36,7 +37,7 @@ document.addEventListener("DOMContentLoaded", function() {
         renderCat();
     });
 
-    // NEW: Mobile-friendly Search Event Listener
+    // Mobile-friendly Search Event Listener
     const searchInput = document.getElementById('crjb-search-input');
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
@@ -48,6 +49,94 @@ document.addEventListener("DOMContentLoaded", function() {
                 renderCat();
             }, 300);
         });
+    }
+
+    // ==========================================
+    // EQUALIZER LOGIC (Web Audio API)
+    // ==========================================
+    let audioCtx;
+    let filters = [];
+    let isEqInitialized = false;
+
+    function initEQ() {
+        if (isEqInitialized) return;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+            
+            const liveSource = audioCtx.createMediaElementSource(live);
+            const prevSource = audioCtx.createMediaElementSource(prev);
+
+            // 5-Band Frequencies: 60Hz, 230Hz, 910Hz, 3.6kHz, 14kHz
+            const frequencies = [60, 230, 910, 3600, 14000];
+            let prevNode = null;
+
+            frequencies.forEach((freq, index) => {
+                let filter = audioCtx.createBiquadFilter();
+                filter.type = index === 0 ? "lowshelf" : (index === frequencies.length - 1 ? "highshelf" : "peaking");
+                filter.frequency.value = freq;
+                filter.Q.value = 1; 
+                filter.gain.value = 0;
+
+                if (prevNode) {
+                    prevNode.connect(filter);
+                }
+                filters.push(filter);
+                prevNode = filter;
+            });
+
+            // Route both audio elements into the first EQ band
+            liveSource.connect(filters[0]);
+            prevSource.connect(filters[0]);
+
+            // Route the final EQ band to the speakers
+            filters[filters.length - 1].connect(audioCtx.destination);
+
+            isEqInitialized = true;
+            loadEQSettings();
+        } catch(e) {
+            console.warn("Web Audio API blocked or not supported.", e);
+        }
+    }
+
+    function loadEQSettings() {
+        let saved = JSON.parse(localStorage.getItem('crjb_eq_settings_' + stationId) || '[0,0,0,0,0]');
+        const sliders = document.querySelectorAll('.crjb-eq-slider');
+        sliders.forEach((slider, i) => {
+            slider.value = saved[i];
+            slider.nextElementSibling.innerText = saved[i] > 0 ? '+' + saved[i] + 'dB' : saved[i] + 'dB';
+            if(filters[i]) filters[i].gain.value = saved[i];
+        });
+    }
+
+    function saveEQSettings() {
+        const sliders = document.querySelectorAll('.crjb-eq-slider');
+        let vals = [];
+        sliders.forEach((slider, i) => {
+            let v = parseFloat(slider.value);
+            vals.push(v);
+            slider.nextElementSibling.innerText = v > 0 ? '+' + v + 'dB' : v + 'dB';
+            if(filters[i]) filters[i].gain.value = v;
+        });
+        localStorage.setItem('crjb_eq_settings_' + stationId, JSON.stringify(vals));
+    }
+
+    // Slider event listeners
+    document.querySelectorAll('.crjb-eq-slider').forEach(slider => {
+        slider.addEventListener('input', () => {
+            if (!isEqInitialized) initEQ();
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+            saveEQSettings();
+        });
+    });
+
+    // Reset EQ Button
+    const resetEqBtn = document.getElementById('crjb-eq-reset');
+    if (resetEqBtn) {
+        resetEqBtn.onclick = () => {
+            document.querySelectorAll('.crjb-eq-slider').forEach(slider => slider.value = 0);
+            saveEQSettings();
+        };
     }
 
     const svgs = {
@@ -126,17 +215,36 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
 
+    if (settingsToggleBtn && settingsPanel) {
+        settingsToggleBtn.onclick = () => {
+            const isHidden = settingsPanel.style.display === 'none';
+            settingsPanel.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                if (infoPanel) infoPanel.style.display = 'none';
+                if (schedulePanel) schedulePanel.style.display = 'none';
+            }
+        };
+    }
+
     if (infoToggleBtn && infoPanel) {
         infoToggleBtn.onclick = () => { 
-            infoPanel.style.display = infoPanel.style.display === 'none' ? 'block' : 'none'; 
-            if (schedulePanel) schedulePanel.style.display = 'none';
+            const isHidden = infoPanel.style.display === 'none';
+            infoPanel.style.display = isHidden ? 'block' : 'none'; 
+            if (isHidden) {
+                if (schedulePanel) schedulePanel.style.display = 'none';
+                if (settingsPanel) settingsPanel.style.display = 'none';
+            }
         };
     }
 
     if (scheduleToggleBtn && schedulePanel) {
         scheduleToggleBtn.onclick = () => { 
-            schedulePanel.style.display = schedulePanel.style.display === 'none' ? 'block' : 'none'; 
-            if (infoPanel) infoPanel.style.display = 'none';
+            const isHidden = schedulePanel.style.display === 'none';
+            schedulePanel.style.display = isHidden ? 'block' : 'none'; 
+            if (isHidden) {
+                if (infoPanel) infoPanel.style.display = 'none';
+                if (settingsPanel) settingsPanel.style.display = 'none';
+            }
         };
     }
 
@@ -262,6 +370,9 @@ document.addEventListener("DOMContentLoaded", function() {
     };
 
     syncBtn.onclick = () => { 
+        if(!isEqInitialized) initEQ();
+        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
         isSync = true; syncBtn.innerHTML = svgs.spinner + ' Connecting...'; poll(); 
     };
 
@@ -621,7 +732,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let sorted = [...catData];
 
-        // NEW: Apply text search filter
+        // Apply text search filter
         if (currentSearchQuery !== '') {
             sorted = sorted.filter(song => 
                 song.title.toLowerCase().includes(currentSearchQuery) || 
@@ -779,6 +890,9 @@ document.addEventListener("DOMContentLoaded", function() {
         if(isPreviewing && currentPreviewUrl === u) { stopPreview(); return; }
         if(isSync) live.pause(); 
         
+        if(!isEqInitialized) initEQ();
+        if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
         isPreviewing = true; currentPreviewUrl = u;
         document.getElementById('crjb-np-status-label').innerText = 'Local Broadcast'; document.getElementById('crjb-np-status-label').style.color = '#28a745';
         document.getElementById('crjb-np-title').innerText = title; document.getElementById('crjb-np-artist').innerHTML = artist;
