@@ -60,3 +60,9 @@
     .crjb-dashboard-grid { grid-template-columns: 380px 1fr; gap: 35px; }
     #crjb-queue-list, #crjb-catalog-list { grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 18px; }
 }
+
+.crjb-eq-controls { display: flex; flex-direction: column; gap: 12px; }
+.crjb-eq-band { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; }
+.crjb-eq-band label { width: 65px; color: var(--crjb-sec); }
+.crjb-eq-slider { flex-grow: 1; margin: 0 10px; accent-color: var(--crjb-accent); cursor: pointer; }
+.crjb-eq-band .eq-val { width: 45px; text-align: right; color: var(--crjb-text); font-family: monospace; }
