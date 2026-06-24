@@ -2252,7 +2252,7 @@ function crjb_process_visitor_upload_handler() {
 add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
 function crjb_cleanup_orphaned_audio_handler() {
     // 1. Verify Security & Permissions
-    if (!isset($_POST['security']) || !wpverify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
+    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
         wp_send_json_error('Security check failed.');
     }
     // Note: Deleting files requires higher privileges
