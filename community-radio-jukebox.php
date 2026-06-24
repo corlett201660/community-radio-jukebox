@@ -290,11 +290,9 @@ function crjb_force_curl_timeout( $handle, $args, $url ) {
 
 add_action('wp_ajax_crjb_import_media_library', 'crjb_import_media_library_handler');
 function crjb_import_media_library_handler() {
-    // 1. Verify Security
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
-    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+    if ( ! check_ajax_referer( 'crjb_gemini_scan_action', 'security', false ) ) { wp_send_json_error('Security check failed.'); }
+    if ( ! current_user_can('edit_posts') ) { wp_send_json_error('Unauthorized.'); }
 
-    // 2. Identify already imported MP3s to prevent duplicates
     global $wpdb;
     // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery
     // phpcs:disable WordPress.DB.DirectDatabaseQuery.NoCaching
@@ -302,7 +300,6 @@ function crjb_import_media_library_handler() {
     // phpcs:enable
     $existing_ids = array_map('intval', $existing_ids_col);
 
-    // 3. Query Media Library for unlinked MP3s
     $args = [
         'post_type'      => 'attachment',
         'post_mime_type' => 'audio/mpeg',
@@ -322,13 +319,11 @@ function crjb_import_media_library_handler() {
         wp_send_json_success(['msg' => 'No unlinked MP3s found. Your catalog is up to date.']);
     }
 
-    // 4. Loop, extract metadata, and create posts
     $imported = 0;
     foreach ($unlinked_mp3s as $attachment_id) {
         $file_path = get_attached_file($attachment_id);
         if (!$file_path) continue;
 
-        // Extract filename and clean it up for the title (removes dashes/underscores)
         $filename = pathinfo($file_path, PATHINFO_FILENAME);
         $clean_title = ucwords(str_replace(['_', '-'], ' ', $filename));
 
@@ -343,19 +338,16 @@ function crjb_import_media_library_handler() {
         if (!is_wp_error($new_song_id)) {
             $url = wp_get_attachment_url($attachment_id);
             
-            // Map core audio metadata required by the JS frontend
             update_post_meta($new_song_id, 'crjb_audio_attachment_id', $attachment_id);
             update_post_meta($new_song_id, 'full_audio_url', esc_url_raw($url));
             update_post_meta($new_song_id, 'preview_url', esc_url_raw($url));
 
-            // Extract exact duration from WP metadata
             require_once( ABSPATH . 'wp-admin/includes/media.php' );
             $meta = wp_read_audio_metadata($file_path);
             if (!empty($meta['length'])) {
                 update_post_meta($new_song_id, 'audio_duration', ceil($meta['length']));
             }
             
-            // Set base safety defaults
             update_post_meta($new_song_id, 'crjb_is_explicit', '0');
             update_post_meta($new_song_id, 'crjb_royalty_free', '0');
             update_post_meta($new_song_id, 'crjb_always_available', '0');
@@ -373,8 +365,8 @@ function crjb_import_media_library_handler() {
 
 add_action('wp_ajax_crjb_gemini_clear_all', 'crjb_gemini_clear_all_handler');
 function crjb_gemini_clear_all_handler() {
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
-    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+    if ( ! check_ajax_referer( 'crjb_gemini_scan_action', 'security', false ) ) { wp_send_json_error('Security check failed.'); }
+    if ( ! current_user_can('edit_posts') ) { wp_send_json_error('Unauthorized.'); }
     
     $all_songs = get_posts([
         'post_type'      => 'crjb_song',
@@ -397,10 +389,9 @@ function crjb_gemini_clear_all_handler() {
 
 add_action('wp_ajax_crjb_gemini_scan', 'crjb_gemini_scan_handler');
 function crjb_gemini_scan_handler() {
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
-    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+    if ( ! check_ajax_referer( 'crjb_gemini_scan_action', 'security', false ) ) { wp_send_json_error('Security check failed.'); }
+    if ( ! current_user_can('edit_posts') ) { wp_send_json_error('Unauthorized.'); }
     
-    // Prevent the PHP process from dying while waiting for the AI audio transcription
     // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
     set_time_limit(150); 
     
@@ -415,16 +406,15 @@ function crjb_gemini_scan_handler() {
 
 add_action('wp_ajax_crjb_gemini_bulk_scan', 'crjb_gemini_bulk_scan_handler');
 function crjb_gemini_bulk_scan_handler() {
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) wp_send_json_error('Security check failed.');
-    if (!current_user_can('edit_posts')) wp_send_json_error('Unauthorized.');
+    if ( ! check_ajax_referer( 'crjb_gemini_scan_action', 'security', false ) ) { wp_send_json_error('Security check failed.'); }
+    if ( ! current_user_can('edit_posts') ) { wp_send_json_error('Unauthorized.'); }
     
-    // Prevent the PHP process from dying while waiting for the AI audio transcription (batch process)
     // phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged
     set_time_limit(300);
     
     $all_songs = get_posts([
         'post_type'      => 'crjb_song',
-        'post_status'    => 'any', // Specifically adjusted to process drafts, pending, etc.
+        'post_status'    => 'any', 
         'posts_per_page' => -1,
         'fields'         => 'ids'
     ]);
@@ -1621,8 +1611,7 @@ add_action( 'wp_ajax_nopriv_crjb_vote', 'crjb_handle_vote' );
 function crjb_handle_vote() {
     if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ) wp_send_json_error('Invalid request method.');
     
-    // Verify frontend security nonce
-    if ( ! isset($_POST['security']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['security'] ) ), 'crjb_frontend_action' ) ) {
+    if ( ! check_ajax_referer( 'crjb_frontend_action', 'security', false ) ) {
         wp_send_json_error('Security check failed. Please refresh the page and try again.');
     }
     
@@ -1690,8 +1679,7 @@ add_action( 'wp_ajax_nopriv_crjb_get_state', 'crjb_get_state' );
 function crjb_get_state() {
     if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
     
-    // Verify frontend security nonce
-    if ( ! isset($_GET['security']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['security'] ) ), 'crjb_frontend_action' ) ) {
+    if ( ! check_ajax_referer( 'crjb_frontend_action', 'security', false ) ) {
         wp_send_json_error('Security check failed. Please refresh the page and try again.');
     }
 
@@ -2211,7 +2199,7 @@ add_action('wp_ajax_nopriv_crjb_process_visitor_upload', 'crjb_process_visitor_u
 
 function crjb_process_visitor_upload_handler() {
     // 1. Strict Nonce & Security Verification
-    if (!isset($_POST['crjb_upload_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['crjb_upload_nonce'])), 'crjb_frontend_upload_action')) {
+    if ( ! check_ajax_referer( 'crjb_frontend_upload_action', 'crjb_upload_nonce', false ) ) {
         wp_send_json_error('Security check failed. Please refresh the page and try again.');
     }
 
@@ -2252,9 +2240,10 @@ function crjb_process_visitor_upload_handler() {
 add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
 function crjb_cleanup_orphaned_audio_handler() {
     // 1. Verify Security & Permissions
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
+    if ( ! check_ajax_referer( 'crjb_gemini_scan_action', 'security', false ) ) {
         wp_send_json_error('Security check failed.');
     }
+
     // Note: Deleting files requires higher privileges
     if (!current_user_can('delete_posts')) {
         wp_send_json_error('Unauthorized.');
