@@ -1621,12 +1621,15 @@ add_action( 'wp_ajax_nopriv_crjb_vote', 'crjb_handle_vote' );
 function crjb_handle_vote() {
     if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST' ) wp_send_json_error('Invalid request method.');
     
-    // phpcs:disable WordPress.Security.NonceVerification.Missing -- Public voting endpoint, protected by session rate-limiting to allow edge caching.
+    // Verify frontend security nonce
+    if ( ! isset($_POST['security']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['security'] ) ), 'crjb_frontend_action' ) ) {
+        wp_send_json_error('Security check failed. Please refresh the page and try again.');
+    }
+    
     $station_id = isset($_POST['station']) ? sanitize_text_field(wp_unslash($_POST['station'])) : 'global';
     $station_id = crjb_validate_station_id($station_id);
 
     $id = isset($_POST['song_id']) ? intval(wp_unslash($_POST['song_id'])) : 0; 
-    // phpcs:enable
 
     $now = time(); 
     
@@ -1687,14 +1690,17 @@ add_action( 'wp_ajax_nopriv_crjb_get_state', 'crjb_get_state' );
 function crjb_get_state() {
     if ( ! isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'GET' ) wp_send_json_error('Invalid request method.');
     
+    // Verify frontend security nonce
+    if ( ! isset($_GET['security']) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['security'] ) ), 'crjb_frontend_action' ) ) {
+        wp_send_json_error('Security check failed. Please refresh the page and try again.');
+    }
+
     $now = time(); 
     
-    // phpcs:disable WordPress.Security.NonceVerification.Recommended -- Public read-only state endpoint, relies on edge caching.
     $lid = isset($_GET['listener_id']) ? sanitize_text_field(wp_unslash($_GET['listener_id'])) : '';
     $is_listening = isset($_GET['is_listening']) ? sanitize_text_field(wp_unslash($_GET['is_listening'])) : 'false';
     
     $station_id = isset($_GET['station']) ? sanitize_text_field(wp_unslash($_GET['station'])) : 'global';
-    // phpcs:enable
     
     $station_id = crjb_validate_station_id($station_id);
 
@@ -2246,7 +2252,7 @@ function crjb_process_visitor_upload_handler() {
 add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
 function crjb_cleanup_orphaned_audio_handler() {
     // 1. Verify Security & Permissions
-    if (!isset($_POST['security']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
+    if (!isset($_POST['security']) || !wpverify_nonce(sanitize_text_field(wp_unslash($_POST['security'])), 'crjb_gemini_scan_action')) {
         wp_send_json_error('Security check failed.');
     }
     // Note: Deleting files requires higher privileges
