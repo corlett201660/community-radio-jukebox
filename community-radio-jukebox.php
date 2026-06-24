@@ -3,7 +3,7 @@
  * Plugin Name: Community Radio Jukebox
  * Plugin URI:  https://github.com/corlett201660/community-radio-jukebox
  * Description: Interactive Jukebox with Auto DJ Flush Prediction, WooCommerce Artist Tipping, Marquee Patches, DJ Drops, Visual Schedules, Monthly Logging, AI Explicit Profiling, and Gemini 2.5 Pro.
- * Version:     4.60.3
+ * Version:     4.60.2
  * Author:      Local Jukebox Architecture
  * License:     GPL v2 or later
  */
@@ -1076,7 +1076,7 @@ function crjb_schedule_details_callback( $post ) {
     $genre      = get_post_meta( $post->ID, 'crjb_genre', true );
     $artist     = get_post_meta( $post->ID, 'crjb_artist', true );
     
-    $all_days = ['everyday' => 'Every Day', 'Monday' => 'Monday', 'Tuesday' => 'Tuesday', 'Wednesday' => 'Wednesday', 'Thursday' => 'Thursday', 'Friday' => 'Friday', 'Saturday' => 'Saturday', 'Sunday' => 'Sunday'];
+    $all_days = ['everyday' => 'Every Day', 'monday' => 'Monday', 'tuesday' => 'Tuesday', 'wednesday' => 'Wednesday', 'thursday' => 'Thursday', 'friday' => 'Friday', 'saturday' => 'Saturday', 'sunday' => 'Sunday'];
     ?>
     <table class="form-table">
         <tr>
@@ -1984,7 +1984,6 @@ function crjb_render_frontend_app($atts) {
                 <?php if ($submit_enabled && !empty($submit_url)): ?><a href="<?php echo esc_url($submit_url); ?>" target="_blank" style="color:inherit; text-decoration:none;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg></a><?php endif; ?>
                 <div id="crjb-catalog-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Toggle Catalog"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></div>
                 <div id="crjb-schedule-toggle" style="cursor:pointer; display:flex; align-items:center;" title="View Schedule"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></div>
-                <div id="crjb-settings-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Settings & EQ"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></div>
                 <div id="crjb-info-toggle" style="cursor:pointer; display:flex; align-items:center;" title="How it works"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></div>
                 <div id="crjb-theme-toggle" style="cursor:pointer; display:flex; align-items:center;" title="Toggle Theme"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></div>
             </div>
@@ -2008,41 +2007,6 @@ function crjb_render_frontend_app($atts) {
                     <ul style="list-style:none; padding:0; margin:0;" id="crjb-schedule-list">
                         <li style="color:var(--crjb-sec); font-style:italic;">Loading schedule...</li>
                     </ul>
-                </div>
-
-                <div id="crjb-settings-panel" style="display:none; background:var(--crjb-bg); border:1px solid var(--crjb-accent); border-radius:12px; padding:15px; font-size:13px; line-height:1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); text-align:left; margin-bottom: 15px;">
-                    <h3 style="margin-top:0; font-size:16px; font-weight:800; border-bottom:1px solid var(--crjb-border); padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center;"><svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Audio Equalizer</h3>
-                    
-                    <div class="crjb-eq-controls">
-                        <div class="crjb-eq-band">
-                            <label>Bass</label>
-                            <input type="range" min="-12" max="12" value="0" class="crjb-eq-slider" data-index="0">
-                            <span class="eq-val">0dB</span>
-                        </div>
-                        <div class="crjb-eq-band">
-                            <label>Low Mid</label>
-                            <input type="range" min="-12" max="12" value="0" class="crjb-eq-slider" data-index="1">
-                            <span class="eq-val">0dB</span>
-                        </div>
-                        <div class="crjb-eq-band">
-                            <label>Mid</label>
-                            <input type="range" min="-12" max="12" value="0" class="crjb-eq-slider" data-index="2">
-                            <span class="eq-val">0dB</span>
-                        </div>
-                        <div class="crjb-eq-band">
-                            <label>High Mid</label>
-                            <input type="range" min="-12" max="12" value="0" class="crjb-eq-slider" data-index="3">
-                            <span class="eq-val">0dB</span>
-                        </div>
-                        <div class="crjb-eq-band">
-                            <label>Treble</label>
-                            <input type="range" min="-12" max="12" value="0" class="crjb-eq-slider" data-index="4">
-                            <span class="eq-val">0dB</span>
-                        </div>
-                        <div style="margin-top: 15px; text-align: right;">
-                            <button id="crjb-eq-reset" class="crjb-btn" style="background:var(--crjb-sec); padding: 6px 12px; font-size: 11px;">Reset EQ</button>
-                        </div>
-                    </div>
                 </div>
 
                 <div class="crjb-now-playing" id="crjb-np-panel" style="text-align:center; padding:15px; background:var(--crjb-panel); border-radius:16px; border-left:6px solid var(--crjb-accent);">
@@ -2147,16 +2111,6 @@ function crjb_render_frontend_uploader_shortcode() {
         <form id="crjb-upload-form" enctype="multipart/form-data">
             <?php wp_nonce_field('crjb_frontend_upload_action', 'crjb_upload_nonce'); ?>
             
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Artist Name</label>
-                <input type="text" id="crjb_artist_name" name="crjb_artist_name" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa;" placeholder="Your Name or Band">
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Song Title</label>
-                <input type="text" id="crjb_song_title" name="crjb_song_title" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; background: #fafafa;" placeholder="Track Name">
-            </div>
-
             <div style="margin-bottom: 20px;">
                 <label style="display: block; font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #333;">Select MP3 File</label>
                 <input type="file" id="crjb_audio_file" name="crjb_audio_file" accept=".mp3,audio/mpeg" required style="width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 8px; background: #fafafa;">
@@ -2263,12 +2217,8 @@ function crjb_process_visitor_upload_handler() {
         wp_send_json_error('No valid file was uploaded, or the file exceeded the server upload limit.');
     }
 
-    // Capture the new form fields (fallback to filename if title is missing)
-    $artist_name = isset($_POST['crjb_artist_name']) ? sanitize_text_field(wp_unslash($_POST['crjb_artist_name'])) : 'Unknown Artist';
-    
     // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
     $file = $_FILES['crjb_audio_file'];
-    $song_title = isset($_POST['crjb_song_title']) && !empty($_POST['crjb_song_title']) ? sanitize_text_field(wp_unslash($_POST['crjb_song_title'])) : preg_replace('/\.[^.]+$/', '', basename($file['name']));
 
     // 2. Strict MIME Type Validation
     $allowed_mimes = ['audio/mpeg', 'audio/mp3'];
@@ -2290,40 +2240,7 @@ function crjb_process_visitor_upload_handler() {
         wp_send_json_error($attachment_id->get_error_message());
     }
 
-    // 5. Create the Jukebox Song Draft immediately
-    $post_id = wp_insert_post([
-        'post_title'  => $song_title,
-        'post_type'   => 'crjb_song',
-        'post_status' => 'draft'
-    ]);
-
-    if ($post_id) {
-        $attachment_url = wp_get_attachment_url($attachment_id);
-        $file_path = get_attached_file($attachment_id);
-
-        // Extract duration via WP audio metadata
-        $meta = wp_read_audio_metadata($file_path);
-        $duration = !empty($meta['length']) ? ceil($meta['length']) : 180;
-
-        // Attach the audio metadata
-        update_post_meta($post_id, 'crjb_audio_attachment_id', $attachment_id);
-        update_post_meta($post_id, 'full_audio_url', esc_url_raw($attachment_url));
-        update_post_meta($post_id, 'preview_url', esc_url_raw($attachment_url));
-        update_post_meta($post_id, 'audio_duration', $duration);
-        
-        // Set base safety defaults
-        update_post_meta($post_id, 'crjb_is_explicit', '0');
-        update_post_meta($post_id, 'crjb_royalty_free', '0');
-        update_post_meta($post_id, 'crjb_always_available', '0');
-        
-        // Assign the User-Provided Artist Taxonomy
-        wp_set_object_terms($post_id, $artist_name, 'crjb_artist', false);
-
-        update_option('crjb_catalog_version', time(), false);
-        wp_send_json_success('Success! Your track has been uploaded securely.');
-    } else {
-        wp_send_json_error('File uploaded, but failed to generate the Draft submission.');
-    }
+    wp_send_json_success('File successfully uploaded to the Media Library.');
 }
 
 add_action('wp_ajax_crjb_cleanup_orphaned_audio', 'crjb_cleanup_orphaned_audio_handler');
