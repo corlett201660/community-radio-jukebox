@@ -2094,6 +2094,14 @@ function crjb_render_frontend_uploader_shortcode() {
         return '<p>Song submissions are currently closed.</p>';
     }
 
+    // Enforce login and role requirements (Admin, Editor, Author, Contributor)
+    if ( ! is_user_logged_in() ) {
+        return '<p style="padding: 20px; background: #fff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; font-weight: 600;">You must be logged in to submit a track.</p>';
+    }
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        return '<p style="padding: 20px; background: #fff; border-radius: 12px; border: 1px solid #e0e0e0; text-align: center; color: #d63638; font-weight: 600;">You do not have permission to submit tracks. Please contact the administrator.</p>';
+    }
+
     ob_start();
     ?>
     <div id="crjb-upload-container" style="max-width: 450px; margin: 0 auto; padding: 25px; background: #fff; border-radius: 16px; border: 1px solid #e0e0e0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); font-family: system-ui, sans-serif;">
@@ -2195,12 +2203,16 @@ function crjb_enqueue_visitor_upload_script() {
 }
 
 add_action('wp_ajax_crjb_process_visitor_upload', 'crjb_process_visitor_upload_handler');
-add_action('wp_ajax_nopriv_crjb_process_visitor_upload', 'crjb_process_visitor_upload_handler');
 
 function crjb_process_visitor_upload_handler() {
     // 1. Strict Nonce & Security Verification
     if ( ! check_ajax_referer( 'crjb_frontend_upload_action', 'crjb_upload_nonce', false ) ) {
         wp_send_json_error('Security check failed. Please refresh the page and try again.');
+    }
+
+    // Backend check to ensure the user has contributor+ privileges
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error('Unauthorized. You do not have permission to upload files.');
     }
 
     if (get_option('crjb_enable_submissions') != '1') {
